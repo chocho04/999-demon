@@ -1,0 +1,1513 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<style>html,body{margin:0;padding:0}</style>
+<meta name="theme-color" content="#F39032"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<title>999 Demon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Russo+One&family=Rubik:wght@500;700;800&display=swap">
+<style>
+/* Layout: one full-screen game. Canvas letterboxed in the middle, HUD on top, touch buttons in the bottom corners. Single look: orange world, navy blocks. */
+:root{
+  --orange:#F39032;
+  --orange-2:#E8731F;
+  --navy:#1A2747;
+  --navy-2:#2A3B66;
+  --cream:#FFF4E2;
+  --lava:#E3341F;
+  --portal:#7B3FE4;
+  --f-title:"Russo One", "Rubik", system-ui, sans-serif;
+  --f-ui:"Rubik", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+html,body{height:100%}
+[hidden]{display:none!important}
+body{background:var(--navy);color:var(--cream);font-family:var(--f-ui);overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:none}
+button{font-family:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--cream);outline-offset:2px}
+#app{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 40%, #22325a, var(--navy) 70%)}
+#wrap{position:relative}
+canvas{display:block;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+
+.hud{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:8px;padding:10px 12px;pointer-events:none}
+.hud .pill{background:rgba(26,39,71,.85);color:var(--cream);border-radius:999px;padding:7px 12px;font:700 13px/1 var(--f-ui);display:flex;align-items:center;gap:6px;white-space:nowrap}
+.hud .pill b{font:800 14px/1 var(--f-ui);font-variant-numeric:tabular-nums}
+.hud .sp{flex:1}
+.hud button{pointer-events:auto;width:38px;height:34px;border-radius:10px;border:0;background:rgba(26,39,71,.85);color:var(--cream);display:grid;place-items:center;padding:0}
+.hud button svg{width:20px;height:20px}
+.hud .fs .i{display:none}.hud .fs.on .i{display:inline}.hud .fs.on .o{display:none}
+.hud .snd .x{display:none}.hud .snd.off .x{display:inline}.hud .snd.off .w{display:none}
+
+.pad{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);display:flex;gap:14px;z-index:5}
+.pad.l{left:max(16px,env(safe-area-inset-left,0px))}
+.pad.r{right:max(16px,env(safe-area-inset-right,0px))}
+.pad button{width:74px;height:74px;border-radius:50%;border:3px solid rgba(255,244,226,.55);background:rgba(26,39,71,.55);color:var(--cream);display:grid;place-items:center;padding:0;touch-action:none}
+.pad button.on{background:rgba(26,39,71,.9);border-color:var(--cream);transform:scale(.95)}
+.pad button svg{width:34px;height:34px}
+.pad.r button{width:90px;height:90px}
+
+.screen{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:var(--orange);color:var(--navy);text-align:center;overflow-y:auto;padding-block:max(20px,env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.screen h1{margin:0;font:400 clamp(54px,16vw,120px)/.9 var(--f-title);letter-spacing:.02em;color:var(--navy);text-shadow:0 6px 0 rgba(0,0,0,.12)}
+.screen h1 span{display:block;font-size:.55em;letter-spacing:.18em}
+.screen h2{margin:0;font:400 clamp(26px,7vw,40px)/1.1 var(--f-title);color:var(--navy)}
+.screen p{margin:0;font:500 16px/1.4 var(--f-ui);max-width:34ch;text-wrap:balance}
+.btn{border:0;border-radius:16px;background:var(--navy);color:var(--cream);font:400 22px/1 var(--f-title);padding:16px 34px;letter-spacing:.04em;box-shadow:0 6px 0 rgba(0,0,0,.25)}
+.btn:active{transform:translateY(3px);box-shadow:0 3px 0 rgba(0,0,0,.25)}
+.btn.ghost{background:transparent;color:var(--navy);box-shadow:inset 0 0 0 3px var(--navy);font-size:17px;padding:12px 22px}
+.stats{font:700 15px var(--f-ui);display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+.worlds{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;width:min(720px,100%)}
+.world{border:0;border-radius:20px;background:var(--navy);color:var(--cream);padding:18px 16px;text-align:left;display:flex;flex-direction:column;gap:8px;box-shadow:0 6px 0 rgba(0,0,0,.22)}
+.world b{font:400 24px/1 var(--f-title)}
+.world span{font:500 14px/1.35 var(--f-ui);color:#C9D2EA}
+.world em{font:700 13px var(--f-ui);font-style:normal;color:var(--orange)}
+.world:disabled{opacity:.45;cursor:default}
+.levels{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;width:min(460px,100%)}
+.lv{aspect-ratio:1;border:0;border-radius:14px;background:var(--navy);color:var(--cream);font:400 22px/1 var(--f-title);box-shadow:0 5px 0 rgba(0,0,0,.22);display:grid;place-items:center;position:relative}
+.lv.done{background:var(--navy-2)}
+.lv.done::after{content:"✓";position:absolute;right:6px;top:4px;font:800 12px var(--f-ui);color:var(--orange)}
+.lv.long{background:#3B1A2E}
+.lv:disabled{opacity:.35;cursor:default}
+.row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.toast{position:fixed;left:50%;top:22%;transform:translate(-50%,-50%);z-index:20;font:400 clamp(30px,8vw,56px)/1 var(--f-title);color:var(--navy);text-shadow:0 4px 0 rgba(255,244,226,.6);pointer-events:none;white-space:nowrap;transition:opacity .3s}
+.rot{position:fixed;left:50%;top:max(10px,env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:4;background:rgba(26,39,71,.85);color:var(--cream);border-radius:999px;padding:8px 14px;font:700 12px var(--f-ui);pointer-events:none;white-space:nowrap}
+@media (pointer:fine){.pad{display:none}}
+</style>
+</head><body>
+
+<div id="app">
+  <div id="wrap">
+    <canvas id="cv"></canvas>
+    <div class="hud" id="hud" hidden>
+      <div class="pill" id="hudLv"></div>
+      <div class="pill" id="hudDeaths"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 2a9 9 0 0 0-9 9c0 3 1.5 5.4 3.7 6.9V21a1 1 0 0 0 1 1h8.6a1 1 0 0 0 1-1v-3.1A9 9 0 0 0 12 2Zm-3.5 12a2 2 0 1 1 0-4 2 2 0 0 1 0 4Zm7 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg><b id="hudD">0</b></div>
+      <div class="sp"></div>
+      <button class="fs" id="fsBtn" aria-label="На весь экран"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="o" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path class="i" d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="snd" id="sndBtn" aria-label="Звук"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path class="w" d="M16 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/><path class="x" d="M16 9l6 6M22 9l-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+      <button id="restartBtn" aria-label="Заново"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12a7 7 0 1 0 2.1-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M4 4v4.5h4.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button id="menuBtn" aria-label="Меню"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<div class="pad l" id="padL" hidden>
+  <button id="bLeft" aria-label="Влево"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  <button id="bRight" aria-label="Вправо"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+</div>
+<div class="pad r" id="padR" hidden>
+  <button id="bJump" aria-label="Прыжок"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15l7-7 7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+</div>
+<div class="rot" id="rot" hidden>Поверни телефон боком — так удобнее</div>
+<div class="toast" id="toast" hidden></div>
+
+<div class="screen" id="scrTitle">
+  <h1 id="logo">999<span>DEMON</span></h1>
+  <p>Уровень хочет тебя обмануть. Не верь полу, дверям и порталам.</p>
+  <div class="stats" id="titleStats"></div>
+  <button class="btn" id="playBtn">ИГРАТЬ</button>
+  <button class="btn ghost" id="codeBtn" style="font-size:14px;padding:9px 18px">Код</button>
+  <button class="btn ghost" id="fsBtn2" style="font-size:14px;padding:9px 18px">⛶ На весь экран</button>
+  <p style="font-size:13px;opacity:.75" id="keysHint">Управление: ← → и пробел (или кнопки на экране)</p>
+  <p style="font-size:11px;opacity:.5;margin-top:4px" id="verLbl">версия <span id="gameVer">2026-10-18.1</span></p>
+</div>
+<div class="screen" id="scrWorlds" hidden>
+  <h2>Выбери мир</h2>
+  <div class="worlds" id="worlds"></div>
+  <button class="btn ghost" id="toTitle">Назад</button>
+</div>
+<div class="screen" id="scrLevels" hidden>
+  <h2 id="lvTitle"></h2>
+  <div class="levels" id="levels"></div>
+  <button class="btn ghost" id="toWorlds">К мирам</button>
+</div>
+<div class="screen" id="scrCode" hidden>
+  <h2>Введи код</h2>
+  <form id="codeForm" class="row" style="align-items:center">
+    <input id="codeIn" type="password" inputmode="numeric" maxlength="4" autocomplete="off" style="width:150px;box-sizing:border-box;font:400 32px/1 var(--f-title);letter-spacing:.3em;text-align:center;border:0;border-radius:14px;padding:12px;background:var(--cream);color:var(--navy)">
+    <button class="btn" type="submit">Ок</button>
+  </form>
+  <p id="codeErr" style="min-height:1.4em"></p>
+  <button class="btn ghost" id="codeBack" type="button">Назад</button>
+</div>
+<div class="screen" id="scrMsg" hidden>
+  <h2 id="msgTitle"></h2>
+  <p id="msgText"></p>
+  <div class="row" id="msgBtns"></div>
+</div>
+
+<script>
+(() => {
+"use strict";
+const T = 40, VW = 960, VH = 560, GY = 11;
+const G_ = 1900, JV = 650, SPEED = 235, MAXF = 950;
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d){ try { const v = localStorage.getItem("d999:" + k); return v === null ? d : JSON.parse(v); } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem("d999:" + k, JSON.stringify(v)); } catch(e){} }
+};
+
+/* ================= LEVELS ================= */
+/* tiles: ground top is row 11. gaps:[[from,to]] holes in the ground. blocks:[[x,y,w,h]].
+   spikes:[[x,n,row]]. door:[x,row]. traps: see build(). */
+const W1 = [
+  { traps:[{ t:"collapse", x:11, w:2, at:10 }, { t:"pop", x:16, n:1, at:15 }] },
+  { blocks:[[14,8,2,1]], traps:[{ t:"shiftHole", x:6, w:2, shift:2.5, at:4.2 }, { t:"ceil", x:11, n:9, at:11 }, { t:"super", x0:11, x1:20 }, { t:"coin", x:15, y:8 }] },
+  { spikes:[[19,1]], traps:[{ t:"collapse", x:4, w:2, at:3.3 }, { t:"shiftSpike", x:9, n:1, at:7.6, shift:2 }, { t:"dropPortal", x:15, at:13, to:[4.6,8] }] },
+  { spawn:[0.4], traps:[{ t:"pair", a:[2], b:[8.2] }, { t:"squeeze", a:4.5, b:11, ta:7.4, tb:8.6, speed:95, after:"portal", delay:0.45 }, { t:"riseWall", x:13, w:5, land:true, delay:0.5, h:4, aim:8.8 }, { t:"fakePortal", x:18.5, pit:[18,20], sp:[20.1,1.5], to:[21.2] }] },
+  { gaps:[[12,14]], traps:[{ t:"trapP", x:7, hidden:true }, { t:"collapse", x:17, w:2, at:16.2 }] },
+  { blocks:[[12,5,1,6]], traps:[{ t:"pair", a:[9], b:[15,6] }, { t:"collapse", x:18, w:2, at:17 }, { t:"pop", x:21, n:1, at:20.3 }] },
+  { traps:[{ t:"doorMove", at:19, to:[2] }, { t:"collapse", x:9, w:2, atL:11.5, after:"door" }, { t:"pop", x:5, n:1, atL:6.6, after:"door" }] },
+  { gaps:[[19,21]], traps:[{ t:"pop", x:3, n:1, at:2 }, { t:"pair", a:[6], b:[17,4] }] },
+  { traps:[{ t:"pop", x:6, n:2, at:5 }, { t:"pop", x:12, n:2, at:11 }, { t:"pop", x:18, n:2, at:17 }] },
+  { gaps:[[6,16]], blocks:[[7,9,3,1],[11,9,3,1]], traps:[{ t:"trapP", x:15, y:8, at:12 }, { t:"pop", x:18, n:1, at:17 }] },
+  { blocks:[[19,4,1,7]], traps:[{ t:"collapse", x:5, w:2, at:4 }, { t:"pop", x:10, n:1, at:9 }, { t:"trapP", x:14 }, { t:"pair", a:[16], b:[21] }] },
+  { spikes:[[10,3]], traps:[{ t:"pair", a:[7], b:[14] }, { t:"chase", x:-1, speed:150, at:1.6 }, { t:"pop", x:17, n:1, at:16 }] },
+  { traps:[{ t:"collapse", x:6, w:2, at:5 }, { t:"collapse", x:10, w:2, at:9.5 }, { t:"trapP", x:15, at:13 }, { t:"drop", x:17.3, at:15, burst:true }, { t:"pop", x:19, n:1, at:18 }] },
+  { gaps:[[8,16]], traps:[{ t:"pair", a:[6], b:[17] }, { t:"pop", x:19, n:1, at:18.2 }, { t:"doorMove", at:20, to:[4] }, { t:"pair", a:[21], b:[2] }] },
+  { w:72, gaps:[[10,16],[30,38],[52,58]], traps:[
+    { t:"collapse", x:6, w:2, at:5 }, { t:"pair", a:[8], b:[17] }, { t:"pop", x:22, n:1, at:21 },
+    { t:"chase", x:11, speed:165, at:24, stop:44 }, { t:"pair", a:[28], b:[39] }, { t:"trapP", x:45, at:43 },
+    { t:"pop", x:48, n:2, at:47 }, { t:"pair", a:[50], b:[59] }, { t:"collapse", x:63, w:2, at:62 },
+    { t:"doorMove", at:68, to:[60] } ], door:[70] }
+];
+const W2 = [
+  { gaps:[[10,12.5]], traps:[{ t:"lava", x:10, w:2.5 }, { t:"fire", x:10.7, period:1.6 }, { t:"pop", x:16, n:1, at:15 }] },
+  { traps:[{ t:"drop", x:9, at:4 }, { t:"roll", at:13, from:"r", speed:300 }] },
+  { traps:[{ t:"doorRun", at:19, to:12, speed:480 }, { t:"pop", x:15, n:1, atL:16.6, after:"door" }] },
+  { gaps:[[7,9.5],[14,16.5]], traps:[{ t:"lava", x:7, w:2.5 }, { t:"lava", x:14, w:2.5 }, { t:"fire", x:15.2, period:1.6 }, { t:"fire", x:7.7, period:1.8 }] },
+  { traps:[{ t:"dropOn", at:3 }, { t:"homing", at:7, ahead:6.8, speed:190 }, { t:"collapse", x:19, w:2, at:18 }, { t:"doorMove", at:19.6, to:[2] },
+    { t:"trail", from:20, to:8, after:"door" }, { t:"collapse", x:11, w:2, atL:15, after:"door" }, { t:"doorRise", floor:[3,6], walkAt:5.5, jumpAt:7.2 }] },
+  { spawn:[3], gaps:[[13,15]], blocks:[[20,4,4,1]], door:[22,4], traps:[{ t:"dropOn", at:4.1 }, { t:"pop", x:0, n:2, atL:2.4 }, { t:"collapse", x:9, w:2, at:8 }, { t:"pair", a:[18], b:[20.6,4] }] },
+  { w:32, spawn:[2], door:[0.5], gaps:[[21,32]], blocks:[[22,7,9,1]], traps:[
+    { t:"doorAppear" }, { t:"spring", x:5 }, { t:"ceil", x:3, n:6, at:0 },
+    { t:"spring", x:20, at:17.6, once:true }, { t:"pair", a:[20,4], b:[22.6,7] }, { t:"lava", x:21, w:11 }, { t:"fakeDoorPlat", x:29, plat:1 },
+    { t:"dropOn", atL:16.6, after:"portal" }, { t:"collapse", x:12.6, w:1.8, atL:15.4, after:"portal" }, { t:"pop", x:9.5, n:1, atL:11.2, after:"portal" } ] },
+  { spawn:[2], door:[19], traps:[{ t:"dropOn" }, { t:"waitPit", x:7.5, w:4, at:5.5, open:1.6, spikes:[14,1], doorSpikes:[20,1.2], airAt:16.5 }] },
+  { door:[21], traps:[{ t:"collapse", x:21, w:2, at:20 }, { t:"lava", x:21, w:2 }, { t:"doorDrop", at:20, to:[12] }, { t:"pop", x:16, n:1, atL:17.6, after:"door" }] },
+  { traps:[{ t:"bounce", x:8, y:6, vx:140 }, { t:"bounce", x:16, y:4, vx:-160 }, { t:"bounce", x:12, y:5, vx:120 }] },
+  { gaps:[[5,19]], blocks:[[7,9,2,1],[11,9,2,1],[15,9,2,1]], traps:[{ t:"lava", x:5, w:14 }, { t:"fire", x:10, period:1.4 }, { t:"fire", x:14, period:1.9 }, { t:"fire", x:5.7, period:1.6 }, { t:"fire", x:17.7, period:1.7 }] },
+  { traps:[{ t:"doorRun", at:17, to:2, speed:420 }, { t:"roll", after:"door", delay:0.8, from:"r", speed:280 }, { t:"collapse", x:9, w:2, atL:11.4, after:"door" }] },
+  { gaps:[[12,14.5]], blocks:[[4,9,2,1],[7,7,3,1]], traps:[{ t:"lava", x:12, w:2.5 }, { t:"fire", x:12.7, period:1.5 }, { t:"doorFake", real:[8,7] }] },
+  { w:86, spawn:[0.5], door:[83], 
+    blocks:[[12,10,1,1],[16.5,10,1,1],[25.5,10,1,1],[30,10,1,1],[39,10,1,1],[43.5,10,1,1],[48,10,1,1],[57,10,1,1],[61.5,10,1,1],[66,10,1,1]],
+    spikes:[[25.5,1,10],[43.5,1,10],[61.5,1,10]], traps:[
+    { t:"spring", x:3, power:1000 },
+    { t:"skyChase", x0:2, at:8.5, speed:200, stop:69 },
+    { t:"collapse", x:21, w:2, at:18.6 }, { t:"collapse", x:34.5, w:2, at:32.3 }, { t:"collapse", x:52.5, w:2, at:50.3 }, { t:"lava", x:21, w:2 }, { t:"lava", x:34.5, w:2 }, { t:"lava", x:52.5, w:2 },
+    { t:"keys", xs:[73,76,79], row:9.1, at:70 },
+    { t:"collapse", x:71, w:10, flag:"bad" }, { t:"lava", x:71, w:10 },
+    { t:"doorSky", flag:"key" } ] },
+  { w:74, spawn:[1], door:[70], gaps:[[17,34],[44,66]], blocks:[[31,6,3,1],[52,9,5,1],[60,9,2,1],[63.5,8,2,1]], traps:[
+    { t:"keys", xs:[5,8,11], row:9.1, wall:15 },
+    { t:"collapse", x:2, w:12, flag:"bad" }, { t:"lava", x:2, w:12 },
+    { t:"lava", x:17, w:17 },
+    { t:"spring", x:18, y:10, post:true, once:true, power:800, flag:"key" }, { t:"spring", x:23, y:10, post:true, once:true, power:800, flag:"key" }, { t:"spring", x:28, y:10, post:true, once:true, power:950, flag:"key" },
+    { t:"button", x:34, row:5 },
+    { t:"collapse", x:37, w:1.5, at:35.6 }, { t:"lava", x:37, w:1.5 },
+    { t:"pop", x:40, n:1, at:38.6 }, { t:"pop", x:42.5, n:1, at:41.2 },
+    { t:"lava", x:44, w:22 },
+    { t:"grav", x0:44, x1:58, g:-260, spikes:[[44,51.5],[57,60]], spring:[51.5,57] } ] }
+];
+/* level 3-14: the big two-loop level Danik invented */
+function make314(loop){
+  const two = loop === 2;
+  const gaps = [[71,73],[103.5,126]];
+  const blocks = [[48,5,23,1],[75,5,6,1],[104,3,21,1],[125,0,1,11],[47,6,1,5],[130,9,2,1],[133,7,2,1],[136,5,2,1]];
+  const traps = [
+    { t:"flyer", at:13, speed:250, stopAt:30.5, cube:29, y:150 },
+    { t:"collapse", x:22, w:2, at:20.8 }, { t:"lava", x:22, w:2 }, { t:"pop", x:26, n:1, at:24.8 },
+    { t:"shut", x:29, at:30.5, speed:900 },
+    { t:"room", x0:30, x1:42, at:30.6, waves:2, n:7 },
+    { t:"gateUp", x:42, y:0, h:GY, flag:"room" },
+    { t:"spring", x:45, power:1100 },
+    { t:"flyer", at:50, speed:190, stopAt:62, y:60 },
+    { t:"rocket", at:53, speed:150, life:6 }, { t:"rocket", at:58, speed:150, life:6 },
+    { t:"shut", x:61, at:62, speed:900 },
+    { t:"pop", x:64, n:1, y:5, at:62.8, hideAt:66.5 },
+    { t:"lavaStrip", x:69.5, w:1.5, y:5, at:66.5 },
+    { t:"fall", x:73, y:5, w:2, delay:0.35 },
+    { t:"gateUp", x:81, y:0, h:5, at:79 },
+    { t:"lava", x:71, w:2 },
+    { t:"keyItem", x:65.5 },
+    { t:"collapse", x:85, w:2, at:83.8 }, { t:"lava", x:85, w:2 },
+    { t:"pop", x:92, n:1, at:90.6 },
+    { t:"collapse", x:98, w:2, at:96.8 }, { t:"lava", x:98, w:2 },
+    { t:"spring", x:102, power:1150, hidden:true },
+    { t:"lava", x:103.5, w:22.5 },
+    { t:"pair", a:[109,3], b:[110,10] }, { t:"pair", a:[112,3], b:[113,10] }, { t:"pair", a:[115,3], b:[116,10] },
+    { t:"pair", a:[118,3], b:[128] }, { t:"pair", a:[121,3], b:[122,10] },
+    { t:"boss", x:147, at:128.5, speed:32, gun:[137,4.3], hp:8 },
+    { t:"pop", x:155, n:1, at:153.6 }
+  ];
+  const spikes = [[67.5,1]];
+  if (two){
+    traps.unshift({ t:"keys", xs:[4,7,10], row:9.1, wall:13, at:2 }, { t:"collapse", x:2, w:10, flag:"bad" }, { t:"lava", x:2, w:10 }, { t:"hello" });
+    traps.push({ t:"collapse", x:157.5, w:2, at:156.6 }, { t:"lava", x:157.5, w:2 }, { t:"doorTrick", at:158, to:165, rise:95 });
+  } else {
+    traps.unshift({ t:"pop", x:8, n:1, at:6.6 });
+    traps.push({ t:"loopEnd", at:155.6 });
+  }
+  return { w:168, spawn:[1], door:[two ? 160 : 158], gaps, blocks, spikes, traps };
+}
+const W3 = [
+  { gaps:[[7,17]], traps:[{ t:"fall", x:8, y:9, w:3, delay:0.35 }, { t:"fall", x:12, y:9, w:3, delay:0.28 }, { t:"pop", x:19, n:1, at:18 }] },
+  { traps:[{ t:"press", from:"l", x0:-2, to:20, speed:125, at:1.6 }, { t:"pop", x:10, n:1, at:9 }, { t:"pop", x:16, n:1, at:15 }] },
+  { traps:[{ t:"shut", x:12, at:9, speed:380 }, { t:"shut", x:18, at:15, speed:380 }, { t:"shut", x:21, at:19.3, speed:420 }] },
+  { gaps:[[5,19]], traps:[{ t:"fall", x:6, y:9, w:2, delay:0.25 }, { t:"fall", x:9, y:8, w:2, delay:0.25 }, { t:"fall", x:12, y:9, w:2, delay:0.25 }, { t:"fall", x:15, y:8, w:2, delay:0.25 }, { t:"pop", x:21, n:1, at:20 }] },
+  { traps:[{ t:"crush", x:8, w:3, at:7, fs:780 }, { t:"crush", x:14, w:3, at:13.5, fs:780 }, { t:"crush", x:19, w:2, at:18.5, fs:780 }] },
+  { spawn:[22], door:[1], traps:[{ t:"press", from:"r", x0:25, to:3, speed:130, atL:21 }, { t:"pop", x:12, n:1, atL:13 }] },
+  { gaps:[[8,16]], traps:[{ t:"lava", x:8, w:8 }, { t:"fall", x:9, y:9, w:2, delay:0.3 }, { t:"fall", x:13, y:9, w:2, delay:0.3 }, { t:"fire", x:11.5, period:1.7 }, { t:"pop", x:19, n:1, at:18 }] },
+  { traps:[{ t:"shut", x:6, at:4, speed:300 }, { t:"roll", at:8, from:"r", speed:320 }, { t:"shut", x:16, at:13, speed:340 }, { t:"collapse", x:19, w:2, at:18.2 }] },
+  { blocks:[[10,3,1,8]], traps:[{ t:"pop", x:3, n:1, at:2 }, { t:"pair", a:[5], b:[15,5] }, { t:"fall", x:14, y:7, w:3, delay:0.3 }, { t:"pop", x:20, n:1, at:19 }] },
+  { blocks:[[17,3,7,1]], door:[20,3], traps:[{ t:"lavaRise", delay:0.6, speed:40 }, { t:"fall", x:5, y:9, w:3, delay:0.5 }, { t:"fall", x:9, y:7, w:3, delay:0.5 }, { t:"fall", x:13, y:5, w:3, delay:0.5 }] },
+  { traps:[{ t:"press", from:"l", x0:-2, to:20, speed:105, at:1.6 }, { t:"crush", x:9, w:2, at:8 }, { t:"pop", x:15, n:1, at:14 }, { t:"pop", x:19, n:1, at:18 }] },
+  { gaps:[[6,18]], traps:[{ t:"slow", x0:0, x1:24, f:0.5 }, { t:"lava", x:6, w:12 }, { t:"fall", x:7, y:9, w:2.5, delay:0.9 }, { t:"fall", x:11, y:9, w:2.5, delay:0.9 }, { t:"fall", x:15, y:9, w:2.5, delay:0.9 }, { t:"fire", x:6.5, period:3.0, hang:0.7, phase:0.00 }, { t:"fire", x:10.25, period:3.0, hang:0.7, phase:1.72 }, { t:"fire", x:14.25, period:3.0, hang:0.7, phase:0.35 }, { t:"fire", x:17.75, period:3.0, hang:0.7, phase:2.15 } ] },
+  { traps:[{ t:"shut", x:5, at:3, speed:320 }, { t:"doorFake", real:[12] }, { t:"press", from:"r", x0:25, to:14, speed:100, after:"door", delay:0.3 }, { t:"pop", x:9, n:1, at:8 }] },
+  { gen:make314 },
+  { w:96, spawn:[2], door:[85], gaps:[[24,34],[42,44],[61,79]], blocks:[[61,6,16,1]], traps:[
+    { t:"press", from:"l", x0:-2, to:23, speed:130, at:3 },
+    { t:"collapse", x:9, w:2, at:8 }, { t:"collapse", x:15, w:2, at:14 }, { t:"collapse", x:20, w:1.5, at:19.2 },
+    { t:"lava", x:24, w:10 }, { t:"fall", x:25, y:10, w:2.5, delay:0.5 }, { t:"fall", x:28.5, y:10, w:2.5, delay:0.5 }, { t:"fall", x:32, y:10, w:2, delay:0.5 },
+    { t:"drop", x:28.8, at:24.8, burst:true }, { t:"drop", x:31.8, at:26.4, burst:true },
+    { t:"pair", a:[36], b:[28,5] }, { t:"pair", a:[39], b:[46,3] }, { t:"lava", x:42, w:2 },
+    { t:"press", from:"l", x0:43.5, to:77, speed:120, at:46.5 },
+    { t:"slow", x0:44, x1:79, f:0.7 },
+    { t:"rocket", at:51, speed:110, life:7 },
+    { t:"spring", x:59, power:930 }, { t:"lava", x:61, w:18 },
+    { t:"pop", x:64, n:1, at:62.6, y:6 }, { t:"pop", x:68, n:1, at:66.6, y:6 }, { t:"pop", x:72, n:1, at:70.6, y:6 },
+    { t:"pair", a:[76,6], b:[80] },
+    { t:"cube", at:82, spawn:86, door:[93], speed:170 } ] }
+];
+const WORLDS = [
+  { name:"Порталы", sub:"Порталы-обманки и проваливающийся пол", levels:W1 },
+  { name:"Лава и мячи", sub:"Лава, огонь, мячи и хитрые двери", levels:W2 },
+  { name:"Финал", sub:"Падающие платформы, стены и давилки", levels:W3 }
+];
+
+/* ================= SOUND ================= */
+const AU = { ctx:null, on: store.get("snd", true) };
+function au(){ if (AU.ctx){ if (AU.ctx.state === "suspended") AU.ctx.resume(); return; } const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+  try { AU.ctx = new AC(); AU.out = AU.ctx.createGain(); AU.out.gain.value = 2.2; AU.out.connect(AU.ctx.destination);
+    AU.mus = AU.ctx.createGain(); AU.mus.gain.value = 0.9; AU.mus.connect(AU.out);
+    const o = AU.ctx.createOscillator(), g = AU.ctx.createGain(); g.gain.value = 0.0001; o.connect(g); g.connect(AU.ctx.destination); o.start(); o.stop(AU.ctx.currentTime + 0.05); } catch(e){} }
+["pointerdown", "touchstart", "touchend", "keydown", "click"].forEach(ev => document.addEventListener(ev, au, true));
+function noise(d, o){ o = o || {}; const c = AU.ctx; if (!c || !AU.on || c.state !== "running") return;
+  const t0 = c.currentTime + (o.delay || 0), len = Math.floor(c.sampleRate*d), buf = c.createBuffer(1, len, c.sampleRate), ch = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) ch[i] = (Math.random()*2 - 1)*(1 - i/len);
+  const src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+  src.buffer = buf; f.type = o.hp ? "highpass" : "lowpass"; f.frequency.value = o.f || 1200; g.gain.value = o.vol || 0.1;
+  src.connect(f); f.connect(g); g.connect(AU.out || c.destination); src.start(t0); }
+/* background music: a creepy little demon tune */
+const MUS = { next:0, step:0, bpm:132 };
+const BASS = [45,45,57,45, 48,48,60,48, 43,43,55,43, 44,44,56,52];
+const MEL  = [69,0,72,0, 71,0,67,0, 69,0,64,0, 68,0,71,0, 69,0,72,76, 74,0,71,0, 72,71,69,67, 68,0,0,0];
+const mf = n => 440*Math.pow(2, (n - 69)/12);
+function musNote(f, t, d, type, vol){ const c = AU.ctx, o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.setValueAtTime(f, t);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(g); g.connect(AU.mus); o.start(t); o.stop(t + d + 0.05); }
+setInterval(() => {
+  const c = AU.ctx; if (!c || c.state !== "running" || !AU.on || typeof mode === "undefined" || mode !== "play"){ MUS.next = 0; return; }
+  const sp = 60/MUS.bpm/2;
+  if (MUS.next < c.currentTime) MUS.next = c.currentTime + 0.05;
+  while (MUS.next < c.currentTime + 0.35){
+    const i = MUS.step, t = MUS.next;
+    musNote(mf(BASS[(i >> 1) % 16]), t, sp*0.9, "triangle", 0.045);
+    const m = MEL[i % 32]; if (m && (i >> 5) % 2 === 1) musNote(mf(m), t, sp*1.6, "square", 0.012);
+    if (i % 4 === 0) { const g = c.createGain(), o = c.createOscillator(); o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.12); g.gain.setValueAtTime(0.06, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14); o.connect(g); g.connect(AU.mus); o.start(t); o.stop(t + 0.2); }
+    MUS.step++; MUS.next += sp;
+  }
+}, 100);
+function tone(f, d, o){ o = o || {}; const c = AU.ctx; if (!c || !AU.on || c.state !== "running") return;
+  const t0 = c.currentTime + (o.delay || 0), osc = c.createOscillator(), g = c.createGain();
+  osc.type = o.type || "square"; osc.frequency.setValueAtTime(f, t0); if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, t0 + d);
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(o.vol || 0.08, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+  osc.connect(g); g.connect(AU.out || c.destination); osc.start(t0); osc.stop(t0 + d + 0.05); }
+const SFX = {
+  jump(){ tone(330, 0.12, { to:620, vol:0.06 }); },
+  die(){ tone(220, 0.35, { to:60, type:"sawtooth", vol:0.1 }); tone(110, 0.3, { to:40, vol:0.06, delay:0.05 }); },
+  win(){ [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.14, { vol:0.07, type:"triangle", delay:i*0.07 })); },
+  trap(){ tone(880, 0.08, { to:440, vol:0.05 }); },
+  portal(){ tone(300, 0.25, { to:1200, type:"sine", vol:0.08 }); },
+  laugh(){ [700, 600, 700, 600].forEach((f, i) => tone(f, 0.07, { vol:0.05, delay:i*0.09 })); },
+  thud(){ tone(120, 0.15, { to:50, type:"sine", vol:0.15 }); noise(0.12, { f:500, vol:0.12 }); },
+  land(){ noise(0.07, { f:700, vol:0.08 }); },
+  step(){ noise(0.03, { f:1800, vol:0.03 }); },
+  boing(){ tone(150, 0.4, { to:1400, type:"sine", vol:0.1 }); tone(300, 0.3, { to:900, type:"triangle", vol:0.05, delay:0.03 }); },
+  key(){ [880, 1175, 1568].forEach((f, i) => tone(f, 0.12, { type:"triangle", vol:0.08, delay:i*0.06 })); },
+  click(){ tone(1800, 0.03, { vol:0.06 }); noise(0.04, { f:3000, hp:true, vol:0.06 }); },
+  boom(){ noise(0.5, { f:600, vol:0.25 }); tone(90, 0.4, { to:30, type:"sine", vol:0.15 }); },
+  sizzle(){ noise(0.5, { f:2500, hp:true, vol:0.1 }); },
+  rumble(){ noise(1.2, { f:180, vol:0.22 }); }
+};
+
+/* ================= LEVEL BUILD ================= */
+let L = null;     // current level state
+let P = null;     // player
+let cur = { w:0, l:0 };
+let deaths = store.get("deaths", 0);
+let progress = store.get("progress", 0);   // number of levels beaten, 0..45
+let unlockAll = store.get("unlockAll", false);
+let mode = "title";
+
+function rect(x, y, w, h){ return { x, y, w, h }; }
+function ov(a, b){ return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
+function pc(){ return P.x + P.w/2; }
+
+function build(desc){
+  const w = desc.w || 24;
+  const S = { w, W:w*T, solids:[], ents:[], spikes:[], time:0, doorEvent:-1, portalEvent:-1, lavaY:null, msgs:[], effects:[], flags:{} };
+  const add = (x, y, ww, h, dyn) => { const s = { x:x*T, y:y*T, w:ww*T, h:h*T, on:true, vy:0, dyn:!!dyn }; S.solids.push(s); return s; };
+  const traps = desc.traps || [];
+  const holes = (desc.gaps || []).map(g => g.slice()).concat(traps.filter(t => t.t === "collapse").map(t => [t.x, t.x + t.w]))
+    .concat(traps.filter(t => t.t === "shiftHole").map(t => [t.x, t.x + t.shift + t.w]))
+    .concat(traps.filter(t => t.t === "riseWall").map(t => [t.x, t.x + t.w]))
+    .concat(traps.filter(t => t.t === "fakePortal").map(t => t.pit.slice()))
+    .concat(traps.filter(t => t.t === "doorRise").map(t => t.floor.slice()))
+    .concat(traps.filter(t => t.t === "waitPit").map(t => [t.x, t.x + t.w]));
+  holes.sort((a, b) => a[0] - b[0]);
+  let c0 = 0;
+  for (const [a, b] of holes){ if (a > c0) add(c0, GY, a - c0, 3); c0 = Math.max(c0, b); }
+  if (c0 < w) add(c0, GY, w - c0, 3);
+  for (const b of desc.blocks || []) add(b[0], b[1], b[2], b[3]);
+  for (const s of desc.spikes || []) S.spikes.push({ x:s[0]*T, y:(s[2] || GY)*T - 20, w:s[1]*T, h:20, up:true });
+  const d = desc.door || [w - 2];
+  S.door = { x:d[0]*T + 4, y:(d[1] || GY)*T - 60, w:32, h:60, vis:true, fake:false, vy:0, tx:null, speed:0, fall:false, alpha:1 };
+  const sp = desc.spawn || [1];
+  S.spawn = { x:sp[0]*T + 8, y:(sp[1] || GY)*T - 34 };
+  for (const tr of traps) S.ents.push(makeTrap(tr, S, add));
+  return S;
+}
+function trig(tr, S){
+  if (tr.flag && !S.flags[tr.flag]) return false;
+  if (tr.after === "door" && !(S.doorEvent >= 0 && S.time - S.doorEvent >= (tr.delay || 0))) return false;
+  if (tr.after === "portal" && !(S.portalEvent >= 0 && S.time - S.portalEvent >= (tr.delay || 0))) return false;
+  if (tr.atL !== undefined && !(pc() <= tr.atL*T)) return false;
+  if (tr.at !== undefined && !(pc() >= tr.at*T)) return false;
+  return true;
+}
+function portalRect(x, row){ return { x:x*T + 2, y:row*T - 74, w:36, h:74 }; }
+
+function makeTrap(tr, S, add){
+  const e = { tr, done:false, t:0 };
+  switch (tr.t){
+    case "collapse": {
+      const s = add(tr.x, GY, tr.w, 3, true);
+      e.upd = dt => {
+        if (!e.done && trig(tr, S)){ e.done = true; e.t = 0.14; SFX.trap(); }
+        if (e.done){ e.t -= dt; if (e.t <= 0){ s.vy += G_*dt; s.y += s.vy*dt; if (s.y > VH + 200) s.on = false; } else s.shake = 1; }
+      };
+      e.solid = s; break;
+    }
+    case "pop": {
+      const k = { x:tr.x*T, y:(tr.y || GY)*T - 20, w:tr.n*T, h:20, up:false, rise:0 };
+      S.spikes.push(k);
+      e.upd = dt => { if (!k.up && !e.gone && trig(tr, S)){ k.up = true; SFX.trap(); } if (k.up) k.rise = Math.min(1, k.rise + dt*14);
+        if (tr.hideAt && k.up && pc() >= tr.hideAt*T){ k.up = false; k.rise = 0; e.gone = true; S.effects.push({ x:k.x + 20, y:k.y + 10, t:0.4 }); } };
+      break;
+    }
+    case "pair": {
+      const a = portalRect(tr.a[0], tr.a[1] || GY), b = portalRect(tr.b[0], tr.b[1] || GY);
+      e.portals = [{ r:a, on:true }, { r:b, on:true, exit:true }];
+      e.upd = () => {
+        if (P.cool > 0) return;
+        const pr = { x:P.x + 6, y:P.y + 6, w:P.w - 12, h:P.h - 12 };
+        if (ov(pr, a)){ P.x = b.x + b.w/2 - P.w/2; P.y = b.y + b.h - P.h - 2; P.vy = Math.min(P.vy, 0); P.cool = 0.45; SFX.portal(); S.effects.push({ x:b.x + b.w/2, y:b.y + b.h/2, t:0.4 }); S.portalEvent = S.time; }
+      };
+      break;
+    }
+    case "trapP": {
+      const r = portalRect(tr.x, tr.y || GY);
+      const p = { r, on: !tr.hidden && tr.at === undefined, hidden: !!tr.hidden };
+      e.portals = [p];
+      e.upd = () => {
+        if (!p.on && !p.hidden && trig(tr, S)){ p.on = true; SFX.trap(); S.effects.push({ x:r.x + r.w/2, y:r.y + r.h/2, t:0.4 }); }
+        const pr = { x:P.x + 6, y:P.y + 6, w:P.w - 12, h:P.h - 12 };
+        if ((p.on || p.hidden) && ov(pr, r)){ p.on = true; p.hidden = false; kill("portal"); }
+      };
+      break;
+    }
+    case "chase": {
+      const p = { r:{ x:tr.x*T, y:GY*T - 74, w:36, h:74 }, on:true, chase:true };
+      e.portals = [p]; e.go = false;
+      e.upd = dt => {
+        if (!e.go && trig(tr, S)) e.go = true;
+        if (e.go){ const dx = (P.x + P.w/2) - (p.r.x + p.r.w/2); p.r.x += Math.sign(dx)*Math.min(Math.abs(dx), tr.speed*dt); if (tr.stop) p.r.x = Math.min(p.r.x, tr.stop*T); }
+        const pr = { x:P.x + 6, y:P.y + 6, w:P.w - 12, h:P.h - 12 };
+        if (ov(pr, p.r)) kill("portal");
+      };
+      break;
+    }
+    case "doorMove":
+      e.upd = () => {
+        if (e.done || !trig(tr, S)) return;
+        e.done = true; const D = S.door;
+        S.effects.push({ x:D.x + D.w/2, y:D.y + D.h/2, t:0.5 });
+        D.x = tr.to[0]*T + 4; D.y = (tr.to[1] || GY)*T - 60;
+        S.effects.push({ x:D.x + D.w/2, y:D.y + D.h/2, t:0.5 });
+        S.doorEvent = S.time; SFX.portal(); say("Ха!");
+      };
+      break;
+    case "doorRun":
+      e.upd = dt => {
+        const D = S.door;
+        if (!e.done && trig(tr, S)){ e.done = true; D.tx = tr.to*T + 4; D.speed = tr.speed; SFX.laugh(); }
+        if (D.tx !== null){
+          const dx = D.tx - D.x; D.x += Math.sign(dx)*Math.min(Math.abs(dx), D.speed*dt);
+          if (Math.abs(D.tx - D.x) < 1){ D.x = D.tx; D.tx = null; S.doorEvent = S.time; }
+        }
+      };
+      break;
+    case "doorFake":
+      S.door.fake = true; e.real = tr.real;
+      break;
+    case "doorDrop":
+      e.upd = dt => {
+        const D = S.door;
+        if (!e.done && trig(tr, S)){ e.done = true; e.t = 0.14; D.fall = true; }
+        if (D.fall){ e.t -= dt; if (e.t <= 0){ D.vy += G_*dt; D.y += D.vy*dt; }
+          if (D.y > VH + 100){ D.fall = false; D.vy = 0; D.x = tr.to[0]*T + 4; D.y = (tr.to[1] || GY)*T - 60; S.effects.push({ x:D.x + 16, y:D.y + 30, t:0.5 }); S.doorEvent = S.time; SFX.laugh(); } }
+      };
+      break;
+    case "lava":
+      e.lava = { x:tr.x*T, y:GY*T + 14, w:tr.w*T, h:VH };
+      e.upd = () => { if (ov({ x:P.x + 4, y:P.y, w:P.w - 8, h:P.h }, e.lava)) kill("lava"); };
+      break;
+    case "lavaRise":
+      S.lavaY = VH + 10; e.upd = dt => {
+        S.time > tr.delay && (S.lavaY -= tr.speed*dt);
+        if (P.y + P.h > S.lavaY + 8) kill("lava");
+      };
+      break;
+    case "fire": {
+      const f = { x:tr.x*T, y:VH + 20, vy:0, r:13, wait:Math.random()*tr.period };
+      e.fire = f;
+      if (tr.hang) e.upd = () => {
+        /* fast fireball: shoots out of the lava 3x faster, hangs in the air, then falls */
+        const low = GY*T + 30, top = low - 4.6*T, rise = 0.15, fall = Math.sqrt(2*(low - top)/G_);
+        const c = ((S.time + tr.phase) % tr.period + tr.period) % tr.period;
+        if (c < rise) f.y = low - (low - top)*(c/rise);
+        else if (c < rise + tr.hang) f.y = top + Math.sin((c - rise)*14)*4;
+        else if (c < rise + tr.hang + fall){ const u = c - rise - tr.hang; f.y = top + 0.5*G_*u*u; }
+        else f.y = VH + 20;
+        if (c < 0.03 && !e.snd){ e.snd = true; noise(0.15, { f:900, vol:0.06 }); } if (c > 0.1) e.snd = false;
+        if (f.y < VH && circleHit(f.x, f.y, f.r - 2)) kill("fire");
+      };
+      else e.upd = dt => {
+        if (f.y > VH){ f.wait -= dt; if (f.wait <= 0){ f.y = GY*T + 30; f.vy = -Math.sqrt(2*G_*4.6*T); f.wait = tr.period; } return; }
+        f.vy += G_*dt; f.y += f.vy*dt;
+        if (f.y > GY*T + 40) f.y = VH + 20;
+        if (circleHit(f.x, f.y, f.r - 2)) kill("fire");
+      };
+      break;
+    }
+    case "roll": case "drop": case "bounce": {
+      e.balls = [];
+      e.upd = dt => {
+        if (!e.done && trig(tr, S)){
+          e.done = true;
+          const r = 22;
+          if (tr.t === "roll"){
+            const x = tr.from === "r" ? cam.x + VW + 40 : cam.x - 40;
+            e.balls.push({ x, y:GY*T - r, vx:(tr.from === "r" ? -1 : 1)*tr.speed, vy:0, r, roll:true, rot:0 });
+            SFX.thud();
+          } else if (tr.t === "drop"){
+            e.balls.push({ x:tr.x*T + 20, y:-40, vx:0, vy:0, r, drop:true, rot:0, bounced:0, burst:!!tr.burst });
+            SFX.trap();
+          } else {
+            e.balls.push({ x:tr.x*T, y:tr.y*T, vx:tr.vx, vy:0, r:20, bounce:true, h:(GY - tr.y + 1.5)*T, rot:0 });
+          }
+        }
+        for (const b of e.balls){
+          b.vy = Math.min(MAXF, b.vy + G_*dt);
+          b.x += b.vx*dt; b.y += b.vy*dt; b.rot += b.vx*dt/b.r;
+          const below = S.solids.find(s => s.on && b.x > s.x && b.x < s.x + s.w && b.y + b.r > s.y && b.y + b.r < s.y + 30 && b.vy >= 0);
+          if (below){
+            b.y = below.y - b.r;
+            if (b.burst){ b.gone = true; SFX.thud(); for (let i = 0; i < 12; i++) parts.push({ x:b.x, y:b.y, vx:(Math.random() - 0.5)*400, vy:-Math.random()*380, s:4 + Math.random()*5, t:0.6 }); continue; }
+            if (b.bounce) b.vy = -Math.sqrt(2*G_*b.h);
+            else if (b.drop && b.bounced < 1){ b.vy = -b.vy*0.45; b.bounced++; if (!b.vx) b.vx = (P.x < b.x ? -1 : 1)*220; }
+            else b.vy = 0;
+          }
+          if (b.bounce && (b.x < b.r || b.x > S.W - b.r)) b.vx = -b.vx;
+          if (circleHit(b.x, b.y, b.r - 3)) kill("ball");
+        }
+        e.balls = e.balls.filter(b => !b.gone && b.y < VH + 80 && b.x > cam.x - 300 && b.x < cam.x + VW + 300);
+      };
+      break;
+    }
+    case "fall": {
+      const s = add(tr.x, tr.y, tr.w, 0.5, true);
+      s.plat = true; e.solid = s;
+      e.upd = dt => {
+        if (!e.done && P.ground === s){ e.done = true; e.t = tr.delay; }
+        if (e.done){ e.t -= dt; if (e.t > 0) s.shake = 1; else { s.shake = 0; s.vy += G_*0.8*dt; s.y += s.vy*dt; if (s.y > VH + 100) s.on = false; } }
+      };
+      break;
+    }
+    case "shut": {
+      const s = { x:tr.x*T, y:-GY*T - 20, w:T, h:GY*T, on:false, vy:0, dyn:true, wall:true };
+      S.solids.push(s); e.solid = s;
+      e.upd = dt => {
+        if (!e.done && trig(tr, S)){ e.done = true; e.moving = true; SFX.trap(); }
+        if (e.moving){
+          s.y = Math.min(0, s.y + tr.speed*dt);
+          if (ov(s, P)) kill("crush");
+          if (s.y >= 0){ e.moving = false; s.on = true; SFX.thud(); }
+        }
+      };
+      break;
+    }
+    case "crush": {
+      const top = 0, bottom = (GY - 2)*T;
+      const s = { x:tr.x*T, y:top, w:tr.w*T, h:2*T, on:false, vy:0, dyn:true, crusher:true };
+      S.solids.push(s); e.solid = s; e.st = "idle";
+      e.upd = dt => {
+        if (e.st === "idle" && trig(tr, S)){ e.st = "shake"; e.t = 0.15; SFX.trap(); }
+        if (e.st === "shake"){ s.shake = 1; e.t -= dt; if (e.t <= 0){ s.shake = 0; e.st = "fall"; } }
+        else if (e.st === "fall"){ s.y += (tr.fs || 700)*dt; if (ov(s, P)) kill("crush"); if (s.y >= bottom){ s.y = bottom; e.st = "down"; e.t = 0.55; s.on = true; SFX.thud(); } }
+        else if (e.st === "down"){ e.t -= dt; if (e.t <= 0) e.st = "rise"; }
+        else if (e.st === "rise"){ const ny = Math.max(top, s.y - 170*dt); if (P.ground === s) P.y -= (s.y - ny); s.y = ny; if (s.y <= top){ e.st = "wait"; e.t = 0.9; s.on = false; } }
+        else if (e.st === "wait"){ e.t -= dt; if (e.t <= 0) e.st = "shake", e.t = 0.15; }
+      };
+      break;
+    }
+    case "press": {
+      const fromL = tr.from === "l";
+      const s = { x:tr.x0*T, y:0, w:1.5*T, h:GY*T, on:true, dyn:true, press:fromL ? 1 : -1 };
+      e.press = s; e.go = false;
+      e.upd = dt => {
+        if (!e.go && trig(tr, S)){ e.go = true; SFX.thud(); }
+        if (e.go){
+          const target = tr.to*T;
+          if (fromL) s.x = Math.min(target, s.x + tr.speed*dt); else s.x = Math.max(target, s.x - tr.speed*dt);
+        }
+        if (ov({ x:s.x, y:s.y, w:s.w, h:s.h }, { x:P.x + 3, y:P.y, w:P.w - 6, h:P.h })) kill("crush");
+      };
+      break;
+    }
+    case "shiftHole": {
+      /* a pit opens in front of you; jump over it and it slides to where you land. Hop into it instead. */
+      const A = add(tr.x, GY, tr.w, 3, true), B = add(tr.x + tr.w, GY, tr.shift - tr.w, 3), C = add(tr.x + tr.shift, GY, tr.w, 3, true);
+      e.st = "closed";
+      const drop = s => { s.falling = true; s.vy = 0; };
+      e.upd = dt => {
+        if (e.st === "closed" && trig(tr, S)){ e.st = "open"; drop(A); SFX.trap(); }
+        else if (e.st === "open" && P.justJumped && pc() >= (tr.x - 2.6)*T && pc() <= (tr.x + tr.w)*T){
+          e.st = "moved"; A.falling = false; A.vy = 0; A.y = GY*T; A.on = true; drop(C); SFX.laugh(); say("Ха!");
+          S.effects.push({ x:(tr.x + tr.shift + tr.w/2)*T, y:GY*T, t:0.4 });
+        }
+        for (const s of [A, C]) if (s.falling){ s.vy += G_*dt; s.y += s.vy*dt; if (s.y > VH + 150){ s.on = false; s.falling = false; } }
+      };
+      break;
+    }
+    case "ceil": {
+      const k = { x:tr.x*T, y:0, w:tr.n*T, h:20, up:false, rise:0, down:true };
+      S.spikes.push(k);
+      e.upd = dt => { if (!k.up && trig(tr, S)){ k.up = true; SFX.trap(); } if (k.up) k.rise = Math.min(1, k.rise + dt*10); };
+      break;
+    }
+    case "shiftSpike": {
+      /* pops up after you land; jump over it and it slides to where you land. Hop short instead. */
+      const k = { x:tr.x*T, y:GY*T - 20, w:tr.n*T, h:20, up:false, rise:0 };
+      S.spikes.push(k); e.st = "hidden"; e.tx = null;
+      e.upd = dt => {
+        if (e.st === "hidden" && trig(tr, S)){ e.st = "up"; k.up = true; SFX.trap(); }
+        if (k.up) k.rise = Math.min(1, k.rise + dt*14);
+        if (e.st === "up" && P.justJumped && pc() >= (tr.x - 2.6)*T && pc() <= (tr.x + tr.n)*T){ e.st = "moving"; e.tx = (tr.x + tr.shift)*T; SFX.laugh(); }
+        if (e.st === "moving"){ k.x = Math.min(e.tx, k.x + 900*dt); if (k.x >= e.tx) e.st = "done"; }
+      };
+      break;
+    }
+    case "dropPortal": {
+      /* a portal slides down from the sky; touching it throws you back over the first pit */
+      const r = portalRect(tr.x, GY), groundY = r.y;
+      r.y = -100;
+      const p = { r, on:false };
+      e.portals = [p]; e.go = false;
+      e.upd = dt => {
+        if (!e.go && trig(tr, S)){ e.go = true; p.on = true; SFX.portal(); }
+        if (e.go && r.y < groundY) r.y = Math.min(groundY, r.y + 650*dt);
+        const pr = { x:P.x + 6, y:P.y + 6, w:P.w - 12, h:P.h - 12 };
+        if (p.on && P.cool <= 0 && ov(pr, r)){
+          P.x = tr.to[0]*T; P.y = tr.to[1]*T - P.h; P.vx = 0; P.vy = 0; P.cool = 0.5; SFX.portal();
+          S.effects.push({ x:P.x + P.w/2, y:P.y + P.h/2, t:0.5 }); say("Обратно в яму!");
+        }
+      };
+      break;
+    }
+    case "squeeze": {
+      /* two spikes slide toward you from both sides */
+      const ka = { x:tr.a*T, y:GY*T - 20, w:T, h:20, up:true }, kb = { x:tr.b*T, y:GY*T - 20, w:T, h:20, up:true };
+      S.spikes.push(ka, kb); e.go = false;
+      e.upd = dt => {
+        if (!e.go && trig(tr, S)){ e.go = true; SFX.trap(); }
+        if (e.go){ ka.x = Math.min(tr.ta*T, ka.x + tr.speed*dt); kb.x = Math.max(tr.tb*T, kb.x - tr.speed*dt); }
+      };
+      break;
+    }
+    case "riseWall": {
+      /* a piece of floor shoots up; standing on it throws you back */
+      const s = add(tr.x, GY, tr.w, 3, true), base = GY*T, top = (GY - tr.h)*T;
+      e.st = "idle"; e.solid = s;
+      e.upd = dt => {
+        if (e.st === "idle" && (tr.land ? P.ground === s : trig(tr, S))){ e.st = "wait"; e.t = tr.delay; }
+        else if (e.st === "wait"){ e.t -= dt; s.shake = 1; if (e.t <= 0){ s.shake = 0; e.st = "up"; SFX.thud();
+            if (P.ground === s || (P.onGround && P.x + P.w > s.x && P.x < s.x + s.w)){
+              const hgt = base - top + 4, t = (420 + Math.sqrt(420*420 + 2*G_*hgt))/G_, aim = (tr.aim || tr.x - 3.4)*T;
+              P.y = top - P.h - 4; P.vy = -420; P.vx = (aim - P.x)/t; P.stun = t + 0.1; P.onGround = false; P.ground = null; } } }
+        else if (e.st === "up"){ const ny = Math.max(top, s.y - 900*dt); s.h += s.y - ny; s.y = ny; if (s.y <= top){ e.st = "hold"; e.t = 0.7; } }
+        else if (e.st === "hold"){ e.t -= dt; if (e.t <= 0) e.st = "down"; }
+        else if (e.st === "down"){ const ny = Math.min(base, s.y + 320*dt); s.h -= ny - s.y; s.y = ny; if (s.y >= base){ s.y = base; s.h = 3*T; e.st = "done"; } }
+      };
+      break;
+    }
+    case "fakePortal": {
+      /* jump over it and spikes appear where you land; walk into it and the floor opens onto the real portal */
+      const pit = add(tr.pit[0], GY, tr.pit[1] - tr.pit[0], 3, true);
+      const fake = { r:portalRect(tr.x, GY), on:true };
+      const real = { r:{ x:tr.pit[0]*T + 4, y:(GY + 1)*T, w:(tr.pit[1] - tr.pit[0])*T - 8, h:2*T }, on:false };
+      const k = { x:tr.sp[0]*T, y:GY*T - 20, w:tr.sp[1]*T, h:20, up:false, rise:0 };
+      S.spikes.push(k); e.portals = [fake, real]; e.st = "idle";
+      e.upd = dt => {
+        if (k.up) k.rise = Math.min(1, k.rise + dt*14);
+        const pr = { x:P.x + 6, y:P.y + 6, w:P.w - 12, h:P.h - 12 };
+        if (e.st === "idle"){
+          if (!P.onGround && pc() >= tr.pit[0]*T && pc() <= tr.pit[1]*T && P.y + P.h < GY*T - 10 && !k.up){ k.up = true; SFX.laugh(); }
+          if (P.onGround && ov(pr, fake.r)){ e.st = "open"; pit.falling = true; pit.vy = 0; fake.on = false; real.on = true; SFX.trap(); }
+        }
+        if (pit.falling){ pit.vy += G_*dt; pit.y += pit.vy*dt; if (pit.y > VH + 150){ pit.on = false; pit.falling = false; } }
+        if (real.on && ov(pr, real.r)){ real.on = false; P.x = tr.to[0]*T; P.y = (tr.to[1] || GY)*T - P.h - 2; P.vx = 0; P.vy = 0; P.cool = 0.5; SFX.portal(); S.effects.push({ x:P.x + 12, y:P.y + 17, t:0.5 }); }
+      };
+      break;
+    }
+    case "dropOn": case "homing": {
+      /* dropOn: a ball aimed at where you will be. homing: a ball that lands ahead and keeps rolling after you */
+      e.balls = [];
+      e.upd = dt => {
+        if (!e.done && trig(tr, S)){
+          e.done = true;
+          const x = tr.t === "dropOn" ? pc() + P.vx*0.66 : pc() + tr.ahead*T;
+          e.balls.push({ x, y:-40, vx:0, vy:0, r:22, rot:0, landed:false, kind:tr.t });
+          SFX.trap();
+        }
+        for (const b of e.balls){
+          b.vy = Math.min(MAXF, b.vy + G_*dt);
+          b.x += b.vx*dt; b.y += b.vy*dt; b.rot += b.vx*dt/b.r;
+          const below = S.solids.find(s => s.on && b.x > s.x && b.x < s.x + s.w && b.y + b.r > s.y && b.y + b.r < s.y + 30 && b.vy >= 0);
+          if (below){
+            b.y = below.y - b.r;
+            if (!b.landed){ b.landed = true; b.vy = -260; SFX.thud(); }
+            else if (b.kind === "dropOn"){ b.gone = true; for (let i = 0; i < 10; i++) parts.push({ x:b.x, y:b.y, vx:(Math.random() - 0.5)*400, vy:-Math.random()*400, s:5 + Math.random()*5, t:0.6, c:"#1A2747" }); }
+            else b.vy = 0;
+            if (b.kind === "homing"){
+              const want = Math.sign(pc() - b.x) || 1;
+              if (!b.vx) b.vx = want*tr.speed;
+              else if (Math.sign(b.vx) !== want){ b.turn = (b.turn || 0) + dt; if (b.turn > 0.7){ b.vx = want*tr.speed; b.turn = 0; } }
+              else b.turn = 0;
+            }
+          }
+          if (circleHit(b.x, b.y, b.r - 3)) kill("ball");
+        }
+        if (tr.t === "homing" && S.doorEvent >= 0) for (const b of e.balls){ if (!b.gone){ b.gone = true; for (let i = 0; i < 10; i++) parts.push({ x:b.x, y:b.y, vx:(Math.random() - 0.5)*400, vy:-Math.random()*400, s:5 + Math.random()*5, t:0.6, c:"#1A2747" }); } }
+        e.balls = e.balls.filter(b => !b.gone && b.y < VH + 80 && b.x > -100 && b.x < S.W + 100);
+      };
+      break;
+    }
+    case "trail": {
+      /* spikes pop up behind you as you run back */
+      const list = [];
+      for (let i = tr.from; i >= tr.to; i--){
+        const k = { x:i*T, y:GY*T - 20, w:T, h:20, up:false, rise:0, at:i - 1.6 };
+        S.spikes.push(k); list.push(k);
+      }
+      e.upd = dt => {
+        if (!trig(tr, S)) return;
+        for (const k of list){
+          const ground = S.solids.some(s => s.on && !s.falling && s.y <= GY*T + 2 && s.y >= GY*T - 2 && k.x >= s.x && k.x + k.w <= s.x + s.w);
+          if (!k.up && ground && pc() <= k.at*T){ k.up = true; SFX.trap(); }
+          if (k.up) k.rise = Math.min(1, k.rise + dt*12);
+        }
+      };
+      break;
+    }
+    case "doorRise": {
+      /* walk up to the door and it rises on a pillar while the floor drops away; jump and it floats up to meet you */
+      const fl = add(tr.floor[0], GY, tr.floor[1] - tr.floor[0], 3, true);
+      e.st = "idle";
+      e.upd = dt => {
+        if (S.doorEvent < 0) return;
+        const D = S.door;
+        if (e.st === "idle"){
+          if (P.justJumped && pc() <= tr.jumpAt*T){ e.st = "float"; SFX.portal(); }
+          else if (P.onGround && pc() <= tr.walkAt*T){
+            e.st = "pillar"; fl.falling = true; fl.vy = 0; SFX.laugh(); say("Ха-ха!");
+            e.pillar = { x:D.x - 6, y:GY*T, w:D.w + 12, h:0, on:true, dyn:true };
+            S.solids.push(e.pillar);
+          }
+        }
+        if (e.st === "float"){ const ty = P.y + P.h - D.h; D.y += Math.max(-700*dt, Math.min(700*dt, ty - D.y)); }
+        if (e.st === "pillar"){
+          const topY = (GY - 3)*T - D.h;
+          if (D.y > topY){ D.y = Math.max(topY, D.y - 320*dt); }
+          e.pillar.y = D.y + D.h; e.pillar.h = GY*T + 3*T - e.pillar.y;
+        }
+        if (fl.falling){ fl.vy += G_*dt; fl.y += fl.vy*dt; if (fl.y > VH + 150){ fl.on = false; fl.falling = false; } }
+      };
+      break;
+    }
+    case "spring": {
+      /* step or land on it and you are launched sky-high */
+      const r = { x:tr.x*T + 4, y:(tr.y || GY)*T - 18, w:32, h:18 };
+      const post = tr.post ? add(tr.x, tr.y, 1, 1) : null;
+      e.spring = { r, on: tr.at === undefined && tr.atL === undefined && !tr.flag, squash:0, hidden:!!tr.hidden };
+      e.upd = dt => {
+        const sp = e.spring;
+        if (!sp.on && !sp.used && trig(tr, S)){ sp.on = true; SFX.trap(); }
+        sp.squash = Math.max(0, sp.squash - dt*4);
+        if (sp.on && P.vy >= 0 && ov({ x:P.x + 3, y:P.y, w:P.w - 6, h:P.h }, r)){
+          P.vy = -(tr.power || 1500); P.super = true; P.onGround = false; P.ground = null; P.y = r.y - P.h - 1;
+          sp.squash = 1; sp.hidden = false; SFX.boing();
+          if (tr.once){ sp.on = false; sp.used = true; if (post){ post.on = false; for (let i = 0; i < 10; i++) parts.push({ x:post.x + Math.random()*40, y:post.y + Math.random()*40, vx:(Math.random() - 0.5)*300, vy:-Math.random()*300, s:6, t:0.7, c:"#1A2747" }); } }
+        }
+      };
+      break;
+    }
+    case "fakeDoorPlat": {
+      /* a door on the platform: touch it and the door and the platform drop into the lava */
+      const plat = S.solids.filter(s => !s.dyn && s.y < GY*T)[0];
+      e.fd = { x:tr.x*T + 4, y:plat.y - 60, w:32, h:60, vis:true };
+      e.upd = dt => {
+        const d = e.fd;
+        if (d.vis && ov({ x:P.x + 4, y:P.y + 4, w:P.w - 8, h:P.h - 8 }, { x:d.x + 8, y:d.y + 14, w:16, h:46 })){
+          d.vis = false; plat.dyn = true; plat.falling = true; plat.vy = 0; SFX.laugh(); say("Ха-ха! Лава!");
+        }
+        if (plat.falling){ plat.vy += G_*dt; plat.y += plat.vy*dt; if (plat.y > VH + 100){ plat.on = false; plat.falling = false; } }
+      };
+      break;
+    }
+    case "doorAppear":
+      S.door.vis = false;
+      e.upd = () => { if (!S.door.vis && S.portalEvent >= 0){ S.door.vis = true; S.effects.push({ x:S.door.x + 16, y:S.door.y + 30, t:0.6 }); } };
+      break;
+    case "waitPit": {
+      /* a wide pit opens with an invisible portal in it (back to start, door locked). Wait and it closes; then spikes and the door appear */
+      const fl = add(tr.x, GY, tr.w, 3, true), baseY = GY*T;
+      const hole = { x:tr.x*T, y:GY*T + 10, w:tr.w*T, h:3*T };
+      const k1 = { x:tr.spikes[0]*T, y:GY*T - 20, w:tr.spikes[1]*T, h:20, up:false, rise:0 };
+      const k2 = { x:tr.doorSpikes[0]*T, y:GY*T - 20, w:tr.doorSpikes[1]*T, h:20, up:false, rise:0 };
+      S.spikes.push(k1, k2);
+      S.door.vis = false; e.st = "idle";
+      e.upd = dt => {
+        if (e.st === "idle" && trig(tr, S)){ e.st = "open"; e.t = tr.open; fl.on = false; SFX.trap(); }
+        else if (e.st === "open"){
+          e.t -= dt;
+          if (ov({ x:P.x + 4, y:P.y, w:P.w - 8, h:P.h }, hole)){
+            P.x = S.spawn.x; P.y = S.spawn.y; P.vx = 0; P.vy = 0; S.locked = true; SFX.portal();
+            S.effects.push({ x:P.x + 12, y:P.y + 17, t:0.5 }); say("Дверь закрыта! Жми ↻");
+          }
+          if (e.t <= 0){ e.st = "closed"; fl.on = true; fl.y = baseY; SFX.thud();
+            if (!S.locked){ S.door.vis = true; k1.up = true; S.effects.push({ x:S.door.x + 16, y:S.door.y + 30, t:0.6 }); } }
+        }
+        else if (e.st === "closed" && !k2.up && !P.onGround && pc() >= tr.airAt*T){ k2.up = true; SFX.trap(); }
+        for (const k of [k1, k2]) if (k.up) k.rise = Math.min(1, k.rise + dt*14);
+      };
+      break;
+    }
+    case "keys": {
+      /* three keys: remember the glowing one, they shuffle, take the right one */
+      const n = tr.xs.length, good = Math.floor(Math.random()*n);
+      const wall = tr.wall !== undefined ? add(tr.wall, 0, 1, GY, true) : null;
+      const K = { slots:tr.xs.map((x, i) => i), pos:tr.xs.map(x => ({ x:x*T + 20, y:tr.row*T })), good, ph:tr.at !== undefined ? "wait" : "show", t:2.2, swaps:7, sw:null, picked:-1 };
+      e.keys = K; if (K.ph === "show") say("Запомни светящийся ключ!", 2.2);
+      e.upd = dt => {
+        const home = i => ({ x:tr.xs[K.slots[i]]*T + 20, y:tr.row*T });
+        if (K.ph === "wait"){ if (trig(tr, S)){ K.ph = "show"; say("Запомни светящийся ключ!", 2.2); } }
+        else if (K.ph === "show"){ K.t -= dt; if (K.t <= 0){ K.ph = "shuffle"; K.t = 0; SFX.trap(); } }
+        else if (K.ph === "shuffle"){
+          if (!K.sw){
+            if (K.swaps <= 0){ K.ph = "pick"; say("Бери правильный ключ!", 1.6); }
+            else { const a = Math.floor(Math.random()*n); let b = Math.floor(Math.random()*(n - 1)); if (b >= a) b++;
+              K.sw = { a, b, t:0, from:[home(a), home(b)] }; const tmp = K.slots[a]; K.slots[a] = K.slots[b]; K.slots[b] = tmp; K.swaps--; tone(500 + Math.random()*300, 0.08, { vol:0.05 }); }
+          }
+          if (K.sw){
+            const w = K.sw; w.t = Math.min(1, w.t + dt/0.42);
+            const ease = w.t < 0.5 ? 2*w.t*w.t : 1 - Math.pow(-2*w.t + 2, 2)/2;
+            const ta = home(w.a), tb = home(w.b);
+            K.pos[w.a] = { x:w.from[0].x + (ta.x - w.from[0].x)*ease, y:ta.y - Math.sin(ease*Math.PI)*46 };
+            K.pos[w.b] = { x:w.from[1].x + (tb.x - w.from[1].x)*ease, y:tb.y + Math.sin(ease*Math.PI)*30 };
+            if (w.t >= 1) K.sw = null;
+          }
+        }
+        else if (K.ph === "pick"){
+          for (let i = 0; i < n; i++){
+            const k = K.pos[i];
+            if (ov({ x:P.x, y:P.y, w:P.w, h:P.h }, { x:k.x - 12, y:k.y - 16, w:24, h:30 })){
+              K.picked = i; K.ph = i === good ? "open" : "bad";
+              if (i === good){ S.flags.key = true; say(wall ? "Правильно! Стена открывается" : "Правильно!", 1.6); SFX.key(); setTimeout(() => SFX.rumble(), 200); }
+              else { S.flags.bad = true; SFX.laugh(); say("Ха-ха! Не тот ключ!"); }
+              break;
+            }
+          }
+        }
+        if (K.ph === "open" && wall && wall.on){ wall.y -= 260*dt; if (wall.y + wall.h < -20) wall.on = false; }
+        if (K.picked >= 0){ const k = K.pos[K.picked]; k.x += (P.x + 12 - k.x)*Math.min(1, dt*12); k.y += (P.y - 14 - k.y)*Math.min(1, dt*12); }
+      };
+      break;
+    }
+    case "flyer": {
+      /* a flying demon chases you, a bit faster than you; it turns into a toothy cube at the room */
+      e.go = false;
+      e.upd = dt => {
+        if (!e.started && trig(tr, S) && pc() < tr.stopAt*T){ e.started = true; e.go = true; e.fly = { x:cam.x - 60, y:tr.y, vx:0, vy:0, flap:0 }; SFX.laugh(); say("Он летит за тобой!"); }
+        const f = e.fly; if (!f) return;
+        if (e.go){
+          if (pc() >= tr.stopAt*T){ e.go = false;
+            if (tr.cube !== undefined){ e.deadCube = { x:Math.min(f.x - 28, tr.cube*T - 60), y:GY*T - 56 }; S.effects.push({ x:f.x, y:f.y, t:0.6 }); say("Он стал кубом!"); }
+            else S.effects.push({ x:f.x, y:f.y, t:0.6 });
+            e.fly = null; SFX.boom(); return; }
+          const tx = P.x + P.w/2, ty = P.y + P.h/2 - 10, dx = tx - f.x, dy = ty - f.y, d = Math.hypot(dx, dy) || 1;
+          f.vx += (dx/d*tr.speed - f.vx)*Math.min(1, dt*3); f.vy += (dy/d*tr.speed - f.vy)*Math.min(1, dt*3);
+          f.x += f.vx*dt; f.y += f.vy*dt; f.flap += dt*14;
+          if (circleHit(f.x, f.y, 20)) kill("flyer");
+        }
+      };
+      break;
+    }
+    case "room": {
+      /* a room that heats up; spikes pop in random places twice — stand where there are none */
+      const tiles = []; for (let x = tr.x0; x < tr.x1; x++){ const k = { x:x*T, y:GY*T - 20, w:T, h:20, up:false, rise:0 }; S.spikes.push(k); tiles.push(k); }
+      e.room = { heat:0, ph:"wait", t:0, wave:0, marks:[] };
+      e.upd = dt => {
+        const R = e.room;
+        if (R.ph === "wait"){ if (trig(tr, S)){ R.ph = "heat"; R.t = 0.9; SFX.rumble(); say("Комната нагревается!", 1.4); } return; }
+        if (R.ph !== "done") R.heat = Math.min(1, R.heat + dt*0.8); else R.heat = Math.max(0, R.heat - dt);
+        R.t -= dt;
+        if (R.ph === "heat" && R.t <= 0){ R.ph = "warn"; R.t = 1.4; const ids = tiles.map((k, i) => i).sort(() => Math.random() - 0.5).slice(0, tr.n); R.marks = ids; tone(300, 0.2, { vol:0.06 }); }
+        else if (R.ph === "warn" && R.t <= 0){ R.ph = "spikes"; R.t = 1.0; for (const i of R.marks) tiles[i].up = true; SFX.trap(); noise(0.3, { f:2500, hp:true, vol:0.1 }); }
+        else if (R.ph === "spikes"){ for (const k of tiles) if (k.up) k.rise = Math.min(1, k.rise + dt*14);
+          if (R.t <= 0){ for (const k of tiles){ k.up = false; k.rise = 0; } R.marks = []; R.wave++;
+            if (R.wave >= tr.waves){ R.ph = "done"; S.flags.room = true; say("Комната открыта!"); SFX.rumble(); } else { R.ph = "heat"; R.t = 0.7; } } }
+      };
+      break;
+    }
+    case "gateUp": {
+      const g = add(tr.x, tr.y, 1, tr.h, true);
+      e.upd = dt => {
+        if (!e.done && trig(tr, S)){ e.done = true; SFX.rumble(); }
+        if (e.done && g.on){ g.y -= 300*dt; if (g.y + g.h < -10) g.on = false; }
+      };
+      break;
+    }
+    case "lavaStrip": {
+      /* a strip of lava appears on a platform */
+      e.strip = { x:tr.x*T, y:tr.y*T - 8, w:tr.w*T, h:8, on:false };
+      e.upd = () => { const st = e.strip;
+        if (!st.on && trig(tr, S)){ st.on = true; noise(0.4, { f:2000, hp:true, vol:0.08 }); }
+        if (st.on && ov({ x:P.x + 4, y:P.y, w:P.w - 8, h:P.h }, { x:st.x, y:st.y, w:st.w, h:st.h + 2 })) kill("lava"); };
+      break;
+    }
+    case "keyItem": {
+      /* a key that unlocks the exit door */
+      S.locked = true; S.lockIcon = true;
+      e.key = { x:tr.x*T + 20, y:(tr.row || GY - 0.6)*T, got:false };
+      e.upd = () => { const k = e.key;
+        if (!k.got && ov(P, { x:k.x - 12, y:k.y - 16, w:24, h:32 })){ k.got = true; S.locked = false; S.lockIcon = false; SFX.key(); say("Ключ от двери у тебя!", 1.5); } };
+      break;
+    }
+    case "boss": {
+      /* a big monster you cannot jump over; climb up, take the gun, it shoots by itself */
+      const B = { x:tr.x*T, y:GY*T - 200, w:110, h:200, hp:tr.hp, go:false, dead:false, hit:0 };
+      const G = { x:tr.gun[0]*T + 20, y:tr.gun[1]*T, got:false, cd:0 };
+      e.boss = B; e.gun = G; e.bullets = [];
+      S.locked = true;
+      e.upd = dt => {
+        if (!B.go && !B.dead && trig(tr, S)){ B.go = true; SFX.rumble(); say("БОСС! Забирайся наверх за пушкой!", 2); }
+        if (!G.got && ov(P, { x:G.x - 18, y:G.y - 12, w:36, h:24 })){ G.got = true; SFX.key(); say("Пушка! Она стреляет сама!", 1.6); }
+        B.hit = Math.max(0, B.hit - dt);
+        if (B.go && !B.dead){
+          B.x -= tr.speed*dt;
+          if (ov({ x:P.x + 3, y:P.y + 3, w:P.w - 6, h:P.h - 6 }, { x:B.x + 6, y:B.y + 6, w:B.w - 12, h:B.h - 6 })) kill("boss");
+          if (G.got){ G.cd -= dt; if (G.cd <= 0){ G.cd = 0.3; const sx = P.x + P.w/2, sy = P.y + 16, tx = B.x + B.w/2, ty = B.y + B.h/2, d = Math.hypot(tx - sx, ty - sy) || 1;
+            e.bullets.push({ x:sx, y:sy, vx:(tx - sx)/d*650, vy:(ty - sy)/d*650 }); tone(900, 0.06, { to:300, vol:0.05 }); } }
+        }
+        for (const b of e.bullets){ b.x += b.vx*dt; b.y += b.vy*dt;
+          if (!B.dead && b.x > B.x && b.x < B.x + B.w && b.y > B.y && b.y < B.y + B.h){ b.gone = true; B.hp--; B.hit = 0.12; noise(0.08, { f:1500, vol:0.08 });
+            if (B.hp <= 0){ B.dead = true; B.go = false; SFX.boom(); setTimeout(() => SFX.boom(), 150); for (let i = 0; i < 30; i++) parts.push({ x:B.x + Math.random()*B.w, y:B.y + Math.random()*B.h, vx:(Math.random() - 0.5)*500, vy:-Math.random()*500, s:6 + Math.random()*6, t:1, c:i % 2 ? "#1A2747" : "#E3341F" });
+              const kk = S.ents.find(x => x.key); if (!kk || kk.key.got) S.locked = false; say("Монстр побеждён!", 1.6); } } }
+        e.bullets = e.bullets.filter(b => !b.gone && b.x > cam.x - 50 && b.x < cam.x + VW + 50 && b.y > -50 && b.y < VH + 50);
+        // the key from under the deck is still needed
+        const kk = S.ents.find(x => x.key); if (B.dead && kk && !kk.key.got) S.locked = true;
+        if (B.dead && (!kk || kk.key.got)) S.locked = false;
+      };
+      break;
+    }
+    case "loopEnd": {
+      /* you jump the spike, the door vanishes and you are sent back to the start */
+      e.upd = dt => {
+        if (!e.done && trig(tr, S) && !S.locked){ e.done = true; e.t = 0.6; const D = S.door; S.effects.push({ x:D.x + 16, y:D.y + 30, t:0.6 }); D.vis = false; SFX.laugh(); say("Ха-ха!"); }
+        if (e.done){ e.t -= dt; if (e.t <= 0 && !e.sent){ e.sent = true; loopN = 2; SFX.portal(); startLevel(cur.w, cur.l); } }
+      };
+      break;
+    }
+    case "doorTrick": {
+      /* loop 2: the door runs further away, then jumps into the air and a spike pops under it */
+      const k = { x:tr.to*T, y:GY*T - 20, w:T, h:20, up:false, rise:0 }; S.spikes.push(k);
+      e.st = "idle";
+      e.upd = dt => {
+        const D = S.door;
+        if (e.st === "idle" && trig(tr, S)){ e.st = "run"; SFX.laugh(); say("Ха-ха! Дверь убегает!"); }
+        if (e.st === "run"){ D.x = Math.min(tr.to*T + 4, D.x + 600*dt); if (D.x >= tr.to*T + 4){ e.st = "wait"; SFX.thud(); } }
+        if (e.st === "wait" && pc() >= (tr.to - 1)*T){ e.st = "up"; e.y0 = D.y; k.up = true; SFX.trap(); tone(300, 0.3, { to:900, type:"sine", vol:0.08 }); say("Прыгай в дверь!"); }
+        if (e.st === "up"){ D.y = Math.max(e.y0 - tr.rise, D.y - 400*dt); }
+        if (k.up) k.rise = Math.min(1, k.rise + dt*14);
+      };
+      break;
+    }
+    case "hello": {
+      /* loop 2: the door floats in the air, tilts and looks at you */
+      e.hello = { t:4.5 }; setTimeout(() => say("Привет! А теперь пройди уровень сначала!", 3.5), 50);
+      e.upd = dt => { if (e.hello) { e.hello.t -= dt; if (e.hello.t <= 0) e.hello = null; } };
+      break;
+    }
+    case "skyChase": {
+      /* a spiky ceiling crashes down behind you and chases you */
+      e.fx = tr.x0*T; e.go = false; e.sky = true;
+      e.upd = dt => {
+        if (!e.go && trig(tr, S)){ e.go = true; SFX.rumble(); SFX.laugh(); say("Беги!!!"); }
+        if (!e.go) return;
+        e.fx = Math.min(tr.stop*T, e.fx + tr.speed*dt);
+        const yb = Math.min(GY*T, (e.fx - (P.x + 4))*1.6);
+        if (P.x + 4 < e.fx && P.y < yb - 6) kill("spike");
+      };
+      break;
+    }
+    case "doorSky": {
+      /* the door is hidden until you win; then it slides down from the sky */
+      S.door.vis = false; S.locked = true; const gy = S.door.y;
+      e.upd = dt => {
+        const D = S.door;
+        if (!e.done && trig(tr, S)){ e.done = true; D.vis = true; D.y = -80; e.go = true; }
+        if (e.go){ D.y = Math.min(gy, D.y + 380*dt); if (D.y >= gy){ e.go = false; S.locked = false; SFX.thud(); S.effects.push({ x:D.x + 16, y:D.y + 30, t:0.5 }); } }
+      };
+      break;
+    }
+    case "button": {
+      /* a button on a wall: press it and the wall sinks into the floor */
+      const gate = add(tr.x, 0, 1, GY, true);
+      e.btn = { x:tr.x*T - 9, y:tr.row*T + 8, w:9, h:26, down:false };
+      e.upd = dt => {
+        const b = e.btn;
+        if (!b.down && ov({ x:P.x, y:P.y, w:P.w + 2, h:P.h }, { x:b.x - 2, y:b.y, w:b.w + 2, h:b.h })){ b.down = true; SFX.click(); setTimeout(() => SFX.rumble(), 120); say("Путь открыт!"); }
+        if (b.down && gate.on){ gate.y += 240*dt; b.x = gate.x - 9; b.y = tr.row*T + 8 + gate.y; if (gate.y >= GY*T) gate.on = false; }
+      };
+      break;
+    }
+    case "grav": {
+      /* upside-down gravity over the big pit; a ceiling spring throws you back down */
+      S.grav = [tr.x0*T, tr.x1*T, tr.g];
+      for (const [a, b] of tr.spikes) S.spikes.push({ x:a*T, y:0, w:(b - a)*T, h:20, up:true, down:true });
+      const r = { x:tr.spring[0]*T, y:0, w:(tr.spring[1] - tr.spring[0])*T, h:18 };
+      e.cspring = { r, squash:0 };
+      e.upd = dt => {
+        const c = e.cspring; c.squash = Math.max(0, c.squash - dt*4);
+        if (!S.flags.gravOff && P.y <= r.h + 4 && P.x + P.w > r.x && P.x < r.x + r.w){
+          S.flags.gravOff = true; P.vy = 650; P.y = r.h + 6; c.squash = 1; SFX.boing(); say("Гравитация обычная!");
+        }
+      };
+      break;
+    }
+    case "slow":
+      S.slowZone = [tr.x0*T, tr.x1*T, tr.f];
+      break;
+    case "rocket": {
+      /* a small slow rocket that steers after you, then burns out */
+      e.go = false;
+      e.upd = dt => {
+        if (!e.go && trig(tr, S)){ e.go = true; e.rk = { x:cam.x + 120, y:-20, vx:0, vy:tr.speed, life:tr.life }; SFX.trap(); }
+        const r = e.rk; if (!r) return;
+        const dx = (P.x + P.w/2) - r.x, dy = (P.y + P.h/2) - r.y, d = Math.hypot(dx, dy) || 1;
+        r.vx += (dx/d*tr.speed - r.vx)*Math.min(1, dt*2.2); r.vy += (dy/d*tr.speed - r.vy)*Math.min(1, dt*2.2);
+        r.x += r.vx*dt; r.y += r.vy*dt; r.life -= dt;
+        if (Math.random() < dt*30) parts.push({ x:r.x - r.vx*0.08, y:r.y - r.vy*0.08, vx:(Math.random() - 0.5)*40, vy:(Math.random() - 0.5)*40, s:3 + Math.random()*3, t:0.35, c:"#FFB627" });
+        if (circleHit(r.x, r.y, 10)) kill("rocket");
+        if (r.life <= 0){ for (let i = 0; i < 12; i++) parts.push({ x:r.x, y:r.y, vx:(Math.random() - 0.5)*300, vy:(Math.random() - 0.5)*300, s:4, t:0.5, c:"#E3341F" }); e.rk = null; SFX.boom(); }
+      };
+      break;
+    }
+    case "cube": {
+      /* the door vanishes, a cube with a face appears and chases you; the door waits at the very end */
+      e.st = "idle";
+      e.upd = dt => {
+        if (e.st === "idle" && trig(tr, S)){
+          e.st = "go"; const D = S.door;
+          S.effects.push({ x:D.x + 16, y:D.y + 30, t:0.5 });
+          D.x = tr.door[0]*T + 4; D.y = (tr.door[1] || GY)*T - 60;
+          S.effects.push({ x:D.x + 16, y:D.y + 30, t:0.6 });
+          e.c = { x:tr.spawn*T, y:GY*T - 56, w:56, h:56, vx:0, turn:0, blink:0 };
+          SFX.laugh(); say("Ам-ам!");
+        }
+        const c = e.c; if (!c) return;
+        const want = Math.sign((P.x + P.w/2) - (c.x + c.w/2)) || 1;
+        if (!c.vx) c.vx = want*tr.speed;
+        else if (Math.sign(c.vx) !== want){ c.turn += dt; if (c.turn > 0.6){ c.vx = want*tr.speed; c.turn = 0; } }
+        else c.turn = 0;
+        c.x = Math.max(0, Math.min(S.W - c.w, c.x + c.vx*dt));
+        c.bob = Math.abs(Math.sin(S.time*9))*6;
+        if (ov({ x:P.x + 3, y:P.y + 3, w:P.w - 6, h:P.h - 6 }, { x:c.x + 4, y:c.y - c.bob + 4, w:c.w - 8, h:c.h - 4 })) kill("cube");
+      };
+      break;
+    }
+    case "super":
+      S.superZone = [tr.x0*T, tr.x1*T];
+      break;
+    case "coin":
+      e.coin = { x:tr.x*T, y:tr.y*T - 18, got:false };
+      e.upd = () => { const c = e.coin; if (!c.got && circleHit(c.x, c.y, 12)){ c.got = true; SFX.win(); say("Монетка!"); } };
+      break;
+    default: e.upd = () => {};
+  }
+  return e;
+}
+function circleHit(cx, cy, r){
+  const nx = Math.max(P.x, Math.min(cx, P.x + P.w)), ny = Math.max(P.y, Math.min(cy, P.y + P.h));
+  return (cx - nx)*(cx - nx) + (cy - ny)*(cy - ny) < r*r;
+}
+
+/* ================= PLAYER & LOOP ================= */
+const keys = { l:false, r:false, j:false };
+let jumpBuf = 0;
+const cam = { x:0 };
+let deadT = 0, winT = 0, parts = [];
+let msg = null;
+
+let loopN = 1;
+function startLevel(w, l){
+  if (mode !== "play" || cur.w !== w || cur.l !== l) loopN = 1;
+  cur = { w, l };
+  const desc = WORLDS[w].levels[l];
+  L = build(desc.gen ? desc.gen(loopN) : desc);
+  P = { x:L.spawn.x, y:L.spawn.y, w:24, h:34, vx:0, vy:0, onGround:false, ground:null, coyote:0, face:1, walk:0, cool:0, dead:false };
+  cam.x = Math.max(0, Math.min(P.x - VW/2, L.W - VW));
+  deadT = 0; winT = 0; parts = []; jumpBuf = 0; msg = null;
+  $("hudLv").textContent = "Мир " + (w + 1) + " · " + (l + 1) + "/15" + (l === 14 ? " · длинный" : "");
+  $("hudD").textContent = deaths;
+  mode = "play";
+  showScreen(null);
+}
+function say(text, t){ msg = { text, t:t || 1.1 }; }
+function kill(why){
+  if (!P.dead && winT <= 0){ if (why === "lava") SFX.sizzle(); else if (why === "crush" || why === "ball") SFX.thud(); }
+  if (P.dead || winT > 0) return;
+  P.dead = true; deadT = 0.75; deaths++; store.set("deaths", deaths); $("hudD").textContent = deaths;
+  for (let i = 0; i < 18; i++) parts.push({ x:P.x + P.w/2, y:P.y + P.h/2, vx:(Math.random() - 0.5)*520, vy:-Math.random()*520, s:4 + Math.random()*6, t:0.9 });
+  SFX.die();
+}
+function solids(){ return L.solids.filter(s => s.on); }
+function moveAxis(dx, dy){
+  const list = solids();
+  P.x += dx;
+  for (const s of list){ if (ov(P, s)){ if (dx > 0) P.x = s.x - P.w; else if (dx < 0) P.x = s.x + s.w; P.vx = 0; } }
+  P.y += dy;
+  if (dy !== 0){ P.onGround = false; P.ground = null; }
+  for (const s of list){ if (ov(P, s)){ if (dy > 0){ P.y = s.y - P.h; P.vy = 0; P.onGround = true; P.ground = s; } else if (dy < 0){ P.y = s.y + s.h; P.vy = 0; } } }
+}
+function update(dt){
+  L.time += dt;
+  for (const e of L.ents) e.upd && e.upd(dt);
+  for (const f of L.effects) f.t -= dt;
+  L.effects = L.effects.filter(f => f.t > 0);
+  if (msg){ msg.t -= dt; if (msg.t <= 0) msg = null; }
+  for (const p of parts){ p.vy += G_*dt; p.x += p.vx*dt; p.y += p.vy*dt; p.t -= dt; }
+  parts = parts.filter(p => p.t > 0);
+
+  if (P.dead){ deadT -= dt; if (deadT <= 0) startLevel(cur.w, cur.l); return; }
+  if (winT > 0){ winT -= dt; P.alpha = Math.max(0, winT/0.6); if (winT <= 0) levelDone(); return; }
+
+  // input
+  const dir = (keys.r ? 1 : 0) - (keys.l ? 1 : 0);
+  const slow = L.slowZone && pc() >= L.slowZone[0] && pc() <= L.slowZone[1] ? L.slowZone[2] : 1;
+  const target = dir*SPEED*slow;
+  if (P.stun > 0) P.stun -= dt; else P.vx += (target - P.vx)*Math.min(1, dt*18);
+  if (dir) P.face = dir;
+  P.cool = Math.max(0, P.cool - dt);
+  P.coyote = P.onGround ? 0.09 : Math.max(0, P.coyote - dt);
+  jumpBuf = Math.max(0, jumpBuf - dt);
+  P.justJumped = false;
+  if (jumpBuf > 0 && (P.onGround || P.coyote > 0)){
+    const sup = L.superZone && pc() >= L.superZone[0] && pc() <= L.superZone[1];
+    P.vy = sup ? -1500 : -JV; P.super = sup; P.onGround = false; P.coyote = 0; jumpBuf = 0; P.justJumped = true;
+    if (sup) tone(200, 0.5, { to:1600, type:"sine", vol:0.09 }); else SFX.jump();
+  }
+  if (P.onGround) P.super = false;
+  if (!keys.j && !P.super && !P.inGrav && P.vy < -260) P.vy = -260;
+  const gz = L.grav && !L.flags.gravOff && pc() >= L.grav[0] && pc() <= L.grav[1];
+  if (gz && !P.inGrav){ P.vy = 0; P.onGround = false; tone(700, 0.5, { to:200, type:"sine", vol:0.08 }); say("Гравитация вверх!"); }
+  P.inGrav = gz;
+  if (gz) P.vy = Math.max(-MAXF, P.vy + L.grav[2]*dt);
+  else P.vy = Math.min(MAXF, P.vy + G_*dt);
+
+  // move in small steps
+  const steps = Math.ceil(Math.max(Math.abs(P.vx*dt), Math.abs(P.vy*dt))/8) || 1;
+  for (let i = 0; i < steps; i++){ moveAxis(P.vx*dt/steps, 0); moveAxis(0, P.vy*dt/steps); }
+  // still standing on a ground solid?
+  if (!P.onGround){
+    const foot = { x:P.x + 2, y:P.y + P.h, w:P.w - 4, h:2 };
+    const g = solids().find(s => ov(foot, s));
+    if (g && P.vy >= 0){ P.onGround = true; P.ground = g; }
+  }
+  // pushed by a rising solid
+  for (const s of solids()){ if (ov(P, s) && s.dyn){ if (s.press){ kill("crush"); } else { P.y = s.y - P.h; P.vy = 0; } } }
+  P.x = Math.max(0, Math.min(L.W - P.w, P.x));
+  if (P.onGround && !P.wasG && P.lastVy > 250) SFX.land();
+  P.wasG = P.onGround; P.lastVy = P.vy > 0 ? P.vy : (P.onGround ? P.lastVy : 0);
+  if (P.onGround && Math.abs(P.vx) > 20){ const before = Math.floor(P.walk/Math.PI); P.walk += dt*14; if (Math.floor(P.walk/Math.PI) !== before) SFX.step(); } else P.walk = 0;
+
+  // spikes
+  for (const k of L.spikes){ if (k.up && (k.rise === undefined || k.rise > 0.5) && ov({ x:P.x + 4, y:P.y, w:P.w - 8, h:P.h }, { x:k.x + 4, y:k.down ? k.y : k.y + 4, w:k.w - 8, h:k.h })) kill("spike"); }
+  if (P.y < -10 && L.spikes.some(k => k.down && k.up && P.x + P.w > k.x && P.x < k.x + k.w)) kill("spike");
+  if (P.y > VH + 40) kill("fall");
+
+  // door
+  const D = L.door;
+  if (D.vis && !L.locked && !D.fall && D.tx === null && ov({ x:P.x + 4, y:P.y + 4, w:P.w - 8, h:P.h - 8 }, { x:D.x + 8, y:D.y + 14, w:D.w - 16, h:D.h - 14 })){
+    if (D.fake){
+      D.fake = false; D.fall = false; D.vis = false; SFX.laugh(); say("Ха-ха! Не та дверь");
+      const ft = L.ents.find(e => e.tr.t === "doorFake");
+      L.effects.push({ x:D.x + 16, y:D.y + 30, t:0.5 });
+      setTimeout(() => { if (!L || !ft) return; D.x = ft.real[0]*T + 4; D.y = (ft.real[1] || GY)*T - 60; D.vis = true; L.doorEvent = L.time; L.effects.push({ x:D.x + 16, y:D.y + 30, t:0.6 }); }, 650);
+    } else if (!P.dead){ winT = 0.6; P.alpha = 1; SFX.win(); }
+  }
+  cam.x += ((Math.max(0, Math.min(P.x + P.w/2 - VW/2, L.W - VW))) - cam.x)*Math.min(1, dt*8);
+}
+function levelDone(){
+  const idx = cur.w*15 + cur.l + 1;
+  if (idx > progress){ progress = idx; store.set("progress", progress); }
+  if (cur.l === 14){
+    mode = "msg";
+    if (cur.w === 2){
+      showMsg("Ты победил 999 Demon!", "Все 45 уровней пройдены. Смертей за всё время: " + deaths + ".", [["В меню", () => showScreen("scrTitle")]]);
+    } else {
+      showMsg("Мир " + (cur.w + 1) + " пройден!", "Открыт мир " + (cur.w + 2) + ": «" + WORLDS[cur.w + 1].name + "».", [["Дальше", () => startLevel(cur.w + 1, 0)], ["К мирам", () => openWorlds()]]);
+    }
+    return;
+  }
+  toast("Пройдено!");
+  startLevel(cur.w, cur.l + 1);
+}
+
+/* ================= DRAW ================= */
+const cv = $("cv"), ctx = cv.getContext("2d");
+let scale = 1, DPR = 1;
+function fit(){
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const portrait = vh > vw;
+  const availH = portrait ? vh - 140 : vh;
+  scale = Math.min(vw/VW, availH/VH);
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(VW*scale*DPR); cv.height = Math.round(VH*scale*DPR);
+  cv.style.width = Math.round(VW*scale) + "px"; cv.style.height = Math.round(VH*scale) + "px";
+  $("wrap").style.marginBottom = portrait ? "110px" : "0";
+  const touch = matchMedia("(pointer:coarse)").matches;
+  $("rot").hidden = !(portrait && touch && mode === "play");
+}
+window.addEventListener("resize", fit);
+
+function drawBg(){
+  const g = ctx.createLinearGradient(0, 0, 0, VH);
+  g.addColorStop(0, "#F7A548"); g.addColorStop(1, "#EB7A22");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+  ctx.fillStyle = "rgba(255,240,210,.12)";
+  for (let i = 0; i < 6; i++){
+    const x = ((i*211 - cam.x*0.25) % (VW + 200) + VW + 200) % (VW + 200) - 100;
+    ctx.beginPath(); ctx.arc(x, 90 + (i % 3)*70, 40 + (i % 2)*24, 0, Math.PI*2); ctx.fill();
+  }
+}
+function blockRect(s){
+  const sh = s.shake ? (Math.random() - 0.5)*4 : 0;
+  ctx.fillStyle = "#1A2747"; ctx.fillRect(s.x + sh, s.y, s.w, s.h);
+  ctx.fillStyle = "#2A3B66"; ctx.fillRect(s.x + sh, s.y, s.w, Math.min(6, s.h));
+}
+function drawSpikes(k){
+  const rise = k.rise === undefined ? 1 : k.rise; if (!k.up && !rise) return;
+  const h = k.h*rise, n = Math.round(k.w/20);
+  ctx.fillStyle = "#1A2747";
+  for (let i = 0; i < n; i++){
+    const x = k.x + i*20; ctx.beginPath();
+    if (k.down){ ctx.moveTo(x, k.y); ctx.lineTo(x + 10, k.y + h); ctx.lineTo(x + 20, k.y); }
+    else { ctx.moveTo(x, k.y + k.h); ctx.lineTo(x + 10, k.y + k.h - h); ctx.lineTo(x + 20, k.y + k.h); }
+    ctx.closePath(); ctx.fill();
+  }
+}
+function drawPortal(r, exit){
+  const cx = r.x + r.w/2, cy = r.y + r.h/2, t = performance.now()/400;
+  ctx.save();
+  ctx.fillStyle = exit ? "rgba(123,63,228,.35)" : "rgba(123,63,228,.55)";
+  ctx.beginPath(); ctx.ellipse(cx, cy, r.w/2 + 4, r.h/2 + 2, 0, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = "#7B3FE4"; ctx.lineWidth = 5; ctx.beginPath(); ctx.ellipse(cx, cy, r.w/2, r.h/2, 0, 0, Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = "#D9C8FF"; ctx.lineWidth = 2.5;
+  for (let i = 0; i < 3; i++){ ctx.beginPath(); ctx.ellipse(cx, cy, (r.w/2 - 5)*(1 - i*0.28), (r.h/2 - 6)*(1 - i*0.28), 0, t + i*1.7, t + i*1.7 + 3.4); ctx.stroke(); }
+  ctx.restore();
+}
+function drawDoor(D){
+  if (!D.vis) return;
+  ctx.save();
+  ctx.fillStyle = "#1A2747"; ctx.fillRect(D.x - 4, D.y - 4, D.w + 8, D.h + 4);
+  ctx.fillStyle = "#FFE2A8"; ctx.fillRect(D.x, D.y, D.w, D.h);
+  ctx.fillStyle = "#F7B65A"; ctx.fillRect(D.x + 4, D.y + 6, D.w - 8, D.h - 10);
+  ctx.fillStyle = "#1A2747"; ctx.beginPath(); ctx.arc(D.x + D.w - 8, D.y + D.h/2 + 4, 3, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function drawPlayer(){
+  if (P.dead) return;
+  ctx.save();
+  ctx.globalAlpha = P.alpha === undefined ? 1 : P.alpha;
+  const x = Math.round(P.x), y = Math.round(P.y), f = P.face;
+  const lg = Math.sin(P.walk)*4;
+  ctx.fillStyle = "#0C0C10";
+  ctx.fillRect(x + 4, y + 26, 6, 8 + (P.onGround ? -Math.max(0, lg) : -2));
+  ctx.fillRect(x + 14, y + 26, 6, 8 + (P.onGround ? -Math.max(0, -lg) : 0));
+  ctx.fillRect(x + 2, y + 13, 20, 15);
+  ctx.fillRect(x + 3, y, 18, 14);
+  ctx.fillRect(x - 1, y + 14 + (P.onGround ? lg*0.4 : -4), 4, 10);
+  ctx.fillRect(x + 21, y + 14 + (P.onGround ? -lg*0.4 : -4), 4, 10);
+  ctx.fillStyle = "#FFF4E2";
+  const ex = f > 0 ? 3 : -3;
+  ctx.fillRect(x + 7 + ex, y + 4, 4, 5); ctx.fillRect(x + 14 + ex, y + 4, 4, 5);
+  ctx.restore();
+}
+function draw(){
+  ctx.setTransform(scale*DPR, 0, 0, scale*DPR, 0, 0);
+  drawBg();
+  if (!L) return;
+  ctx.save(); ctx.translate(-Math.round(cam.x), 0);
+  for (const e of L.ents){
+    if (e.lava){ drawLava(e.lava.x, e.lava.y, e.lava.w); }
+  }
+  for (const e of L.ents){
+    if (e.portals) for (const p of e.portals){ if (p.on) drawPortal(p.r, p.exit); }
+  }
+  drawDoor(L.door);
+  if (L.lockIcon && L.door.vis){ const D = L.door; ctx.fillStyle = "#1A2747"; ctx.fillRect(D.x + 6, D.y + 26, 20, 16); ctx.strokeStyle = "#1A2747"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(D.x + 16, D.y + 26, 7, Math.PI, 0); ctx.stroke(); ctx.fillStyle = "#FFD23F"; ctx.fillRect(D.x + 14, D.y + 31, 4, 6); }
+  for (const s of L.solids){ if (s.on || s.wall || s.crusher) { if (s.y > -s.h - 5) blockRect(s); } }
+  for (const e of L.ents){
+    if (e.press){ const s = e.press; blockRect(s); ctx.fillStyle = "#1A2747"; const dir = s.press; const edge = dir > 0 ? s.x + s.w : s.x;
+      for (let y = 10; y < s.h; y += 26){ ctx.beginPath(); ctx.moveTo(edge, y); ctx.lineTo(edge + dir*16, y + 11); ctx.lineTo(edge, y + 22); ctx.closePath(); ctx.fill(); } }
+    if (e.balls) for (const b of e.balls){ ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.rot); ctx.fillStyle = "#1A2747"; ctx.beginPath(); ctx.arc(0, 0, b.r, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = "#F39032"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, b.r*0.55, 0, Math.PI); ctx.stroke(); ctx.restore(); }
+    if (e.spring && e.spring.on && !e.spring.hidden){ const r = e.spring.r, sq = e.spring.squash*8; ctx.fillStyle = "#1A2747"; ctx.fillRect(r.x, r.y + r.h - 5, r.w, 5); ctx.strokeStyle = "#1A2747"; ctx.lineWidth = 3; ctx.beginPath(); for (let i = 0; i <= 4; i++){ const yy = r.y + r.h - 5 - i*(r.h - 8 - sq)/4; ctx.lineTo(r.x + (i % 2 ? r.w - 4 : 4), yy); } ctx.stroke(); ctx.fillStyle = "#E3341F"; ctx.fillRect(r.x - 2, r.y + sq, r.w + 4, 5); }
+    if (e.fd && e.fd.vis) drawDoor(e.fd);
+    if (e.keys){ const K = e.keys, tt = performance.now()/200;
+      for (let i = 0; i < K.pos.length; i++){ const k = K.pos[i], glow = K.ph === "show" && i === K.good;
+        ctx.save(); ctx.translate(k.x, k.y + (K.ph === "pick" ? Math.sin(tt + i)*3 : 0));
+        if (glow){ ctx.fillStyle = "rgba(255,240,140,.55)"; ctx.beginPath(); ctx.arc(0, 0, 24 + Math.sin(tt*2)*4, 0, Math.PI*2); ctx.fill(); }
+        ctx.fillStyle = "#FFD23F"; ctx.strokeStyle = "#A8700E"; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(0, -8, 8, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        ctx.fillRect(-2.5, -1, 5, 16); ctx.fillRect(2, 8, 6, 3); ctx.fillRect(2, 12, 5, 3);
+        ctx.fillStyle = "#A8700E"; ctx.beginPath(); ctx.arc(0, -8, 3, 0, Math.PI*2); ctx.fill();
+        ctx.restore(); } }
+    if (e.sky && e.go){ const fx = e.fx, k = 1.6, x0 = cam.x - 40;
+      ctx.fillStyle = "#1A2747"; ctx.beginPath(); ctx.moveTo(x0, 0); ctx.lineTo(fx, 0);
+      ctx.lineTo(Math.max(x0, fx - GY*T/k), Math.min(GY*T, (fx - x0)*k)); ctx.lineTo(x0, Math.min(GY*T, (fx - x0)*k)); ctx.closePath(); ctx.fill();
+      for (let x = Math.floor((fx - GY*T/k)/20)*20; x < fx; x += 20){ const y = (fx - x)*k; if (y <= 0 || y >= GY*T || x < x0) continue;
+        ctx.beginPath(); ctx.moveTo(x - 9, y - 6); ctx.lineTo(x + 9, y + 8); ctx.lineTo(x - 6, y + 16); ctx.closePath(); ctx.fill(); } }
+    if (e.fly){ const f = e.fly, w = Math.sin(f.flap)*10;
+      ctx.fillStyle = "#1A2747"; ctx.beginPath(); ctx.moveTo(f.x - 8, f.y); ctx.lineTo(f.x - 34, f.y - 10 + w); ctx.lineTo(f.x - 22, f.y + 8); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(f.x + 8, f.y); ctx.lineTo(f.x + 34, f.y - 10 + w); ctx.lineTo(f.x + 22, f.y + 8); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#0C0C10"; ctx.beginPath(); ctx.arc(f.x, f.y, 18, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(f.x - 12, f.y - 12); ctx.lineTo(f.x - 8, f.y - 26); ctx.lineTo(f.x - 3, f.y - 14); ctx.fill(); ctx.beginPath(); ctx.moveTo(f.x + 12, f.y - 12); ctx.lineTo(f.x + 8, f.y - 26); ctx.lineTo(f.x + 3, f.y - 14); ctx.fill();
+      const lk = (P.x > f.x) ? 2 : -2; ctx.fillStyle = "#FFD23F"; ctx.fillRect(f.x - 9 + lk, f.y - 5, 6, 6); ctx.fillRect(f.x + 3 + lk, f.y - 5, 6, 6);
+      ctx.fillStyle = "#E3341F"; ctx.fillRect(f.x - 7, f.y + 6, 14, 4); }
+    if (e.deadCube){ const c = e.deadCube; ctx.fillStyle = "#1A2747"; ctx.fillRect(c.x, c.y, 56, 56); ctx.fillStyle = "#FFF4E2"; ctx.fillRect(c.x + 10, c.y + 12, 13, 13); ctx.fillRect(c.x + 33, c.y + 12, 13, 13);
+      ctx.fillStyle = "#0C0C10"; ctx.fillRect(c.x + 16, c.y + 16, 6, 7); ctx.fillRect(c.x + 39, c.y + 16, 6, 7); ctx.fillStyle = "#E3341F"; ctx.fillRect(c.x + 12, c.y + 34, 32, 10); ctx.fillStyle = "#FFF4E2"; for (let i = 0; i < 4; i++) ctx.fillRect(c.x + 14 + i*8, c.y + 34, 4, 4); }
+    if (e.room){ const R = e.room, tr = e.tr; if (R.heat > 0){ ctx.fillStyle = "rgba(227,52,31," + (R.heat*0.28) + ")"; ctx.fillRect(tr.x0*T, 0, (tr.x1 - tr.x0)*T, GY*T); }
+      if (R.ph === "warn" && Math.floor(performance.now()/120) % 2 === 0){ ctx.fillStyle = "rgba(227,52,31,.85)"; for (const i of R.marks) ctx.fillRect((tr.x0 + i)*T + 4, GY*T - 6, T - 8, 6); } }
+    if (e.strip && e.strip.on) drawLava(e.strip.x, e.strip.y, e.strip.w);
+    if (e.key && !e.key.got){ const k = e.key, bob = Math.sin(performance.now()/250)*3; ctx.save(); ctx.translate(k.x, k.y + bob);
+      ctx.fillStyle = "rgba(255,240,140,.45)"; ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = "#FFD23F"; ctx.strokeStyle = "#A8700E"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, -8, 8, 0, Math.PI*2); ctx.fill(); ctx.stroke(); ctx.fillRect(-2.5, -1, 5, 16); ctx.fillRect(2, 8, 6, 3); ctx.fillRect(2, 12, 5, 3); ctx.restore(); }
+    if (e.boss){ const B = e.boss, G = e.gun;
+      if (!G.got){ const bob = Math.sin(performance.now()/250)*3; ctx.fillStyle = "#0C0C10"; ctx.fillRect(G.x - 16, G.y - 6 + bob, 26, 9); ctx.fillRect(G.x - 14, G.y + bob, 8, 12); ctx.fillStyle = "#E3341F"; ctx.fillRect(G.x + 8, G.y - 5 + bob, 6, 7); }
+      else if (!P.dead){ ctx.fillStyle = "#0C0C10"; const gx = P.x + P.w/2 + P.face*8, gy = P.y + 16; ctx.fillRect(gx - 8, gy - 3, 18*P.face, 6); }
+      ctx.fillStyle = "#FFD23F"; for (const b of e.bullets){ ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, Math.PI*2); ctx.fill(); }
+      if (!B.dead){ const y = B.y + Math.abs(Math.sin(L.time*5))*-5;
+        ctx.fillStyle = B.hit > 0 ? "#FFFFFF" : "#1A2747"; ctx.fillRect(B.x, y, B.w, B.h);
+        ctx.fillStyle = "#2A3B66"; ctx.fillRect(B.x, y, B.w, 8);
+        ctx.fillStyle = "#1A2747"; ctx.beginPath(); ctx.moveTo(B.x + 10, y); ctx.lineTo(B.x + 22, y - 26); ctx.lineTo(B.x + 34, y); ctx.fill(); ctx.beginPath(); ctx.moveTo(B.x + B.w - 10, y); ctx.lineTo(B.x + B.w - 22, y - 26); ctx.lineTo(B.x + B.w - 34, y); ctx.fill();
+        ctx.fillStyle = "#FFF4E2"; ctx.fillRect(B.x + 16, y + 24, 24, 22); ctx.fillRect(B.x + 60, y + 24, 24, 22);
+        ctx.fillStyle = "#E3341F"; ctx.fillRect(B.x + 22 - 4, y + 30, 10, 12); ctx.fillRect(B.x + 66 - 4, y + 30, 10, 12);
+        ctx.fillStyle = "#E3341F"; ctx.fillRect(B.x + 14, y + 70, 72, 26); ctx.fillStyle = "#FFF4E2"; for (let i = 0; i < 6; i++){ ctx.fillRect(B.x + 16 + i*12, y + 70, 7, 8); ctx.fillRect(B.x + 21 + i*11, y + 89, 6, 7); }
+        ctx.fillStyle = "#0C0C10"; ctx.fillRect(B.x, y - 14, B.w, 6); ctx.fillStyle = "#E3341F"; ctx.fillRect(B.x, y - 14, B.w*Math.max(0, B.hp)/e.tr.hp, 6); } }
+    if (e.hello){ const h = e.hello, D = { x:5*T, y:3*T, w:32, h:60 }, tilt = Math.sin(L.time*2.2)*0.35;
+      ctx.save(); ctx.translate(D.x + 16, D.y + 30); ctx.rotate(tilt); ctx.globalAlpha = Math.min(1, h.t);
+      ctx.fillStyle = "#1A2747"; ctx.fillRect(-20, -34, 40, 64); ctx.fillStyle = "#FFE2A8"; ctx.fillRect(-16, -30, 32, 60); ctx.fillStyle = "#F7B65A"; ctx.fillRect(-12, -24, 24, 50);
+      const lk = Math.max(-3, Math.min(3, (P.x - D.x)/60)); ctx.fillStyle = "#FFF4E2"; ctx.fillRect(-11, -16, 9, 9); ctx.fillRect(3, -16, 9, 9); ctx.fillStyle = "#0C0C10"; ctx.fillRect(-9 + lk, -13, 4, 5); ctx.fillRect(5 + lk, -13, 4, 5);
+      ctx.fillStyle = "#1A2747"; ctx.fillRect(-6, 4, 12, 3); ctx.restore(); }
+    if (e.btn){ const b = e.btn; ctx.fillStyle = b.down ? "#2E9D4F" : "#E3341F"; ctx.fillRect(b.x + (b.down ? 5 : 0), b.y, b.down ? 4 : b.w, b.h); ctx.fillStyle = "#1A2747"; ctx.fillRect(b.x + b.w - 2, b.y - 3, 4, b.h + 6); }
+    if (e.cspring){ const r = e.cspring.r, sq = e.cspring.squash*8;
+      ctx.fillStyle = "rgba(123,63,228,.12)"; ctx.fillRect(L.grav[0], 0, L.grav[1] - L.grav[0], VH);
+      if (!L.flags.gravOff){ ctx.fillStyle = "rgba(123,63,228,.35)"; const tt = (performance.now()/12) % 80; for (let x = L.grav[0] + 30; x < L.grav[1]; x += 90) for (let y = VH - tt; y > 40; y -= 80){ ctx.beginPath(); ctx.moveTo(x, y - 14); ctx.lineTo(x - 9, y); ctx.lineTo(x + 9, y); ctx.closePath(); ctx.fill(); } }
+      ctx.fillStyle = "#1A2747"; ctx.fillRect(r.x, 0, r.w, 5); ctx.strokeStyle = "#1A2747"; ctx.lineWidth = 3;
+      for (let j = 0; j < r.w/40; j++){ const x0 = r.x + j*40 + 4; ctx.beginPath(); for (let i = 0; i <= 4; i++){ ctx.lineTo(x0 + (i % 2 ? 28 : 0), 5 + i*(r.h - 8 - sq)/4); } ctx.stroke(); }
+      ctx.fillStyle = "#E3341F"; ctx.fillRect(r.x - 2, r.h - 5 - sq, r.w + 4, 5); }
+    if (e.rk){ const r = e.rk, ang = Math.atan2(r.vy, r.vx); ctx.save(); ctx.translate(r.x, r.y); ctx.rotate(ang);
+      ctx.fillStyle = "#1A2747"; ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(4, -6); ctx.lineTo(-10, -6); ctx.lineTo(-10, 6); ctx.lineTo(4, 6); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#E3341F"; ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(6, -6); ctx.lineTo(6, 6); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#1A2747"; ctx.fillRect(-12, -9, 5, 18); ctx.restore(); }
+    if (e.c){ const c = e.c, y = c.y - c.bob, lookR = (P.x > c.x) ? 4 : -4;
+      ctx.fillStyle = "#1A2747"; ctx.fillRect(c.x, y, c.w, c.h);
+      ctx.fillStyle = "#2A3B66"; ctx.fillRect(c.x, y, c.w, 6);
+      ctx.fillStyle = "#FFF4E2"; ctx.fillRect(c.x + 10, y + 12, 13, 13); ctx.fillRect(c.x + 33, y + 12, 13, 13);
+      ctx.fillStyle = "#0C0C10"; ctx.fillRect(c.x + 14 + lookR, y + 16, 6, 7); ctx.fillRect(c.x + 37 + lookR, y + 16, 6, 7);
+      ctx.fillStyle = "#E3341F"; ctx.fillRect(c.x + 12, y + 34, 32, 10);
+      ctx.fillStyle = "#FFF4E2"; for (let i = 0; i < 4; i++) ctx.fillRect(c.x + 14 + i*8, y + 34, 4, 4); }
+    if (e.coin && !e.coin.got){ const c = e.coin, bob = Math.sin(performance.now()/250)*3; ctx.fillStyle = "#FFD23F"; ctx.beginPath(); ctx.ellipse(c.x, c.y + bob, 11, 12, 0, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = "#C98A12"; ctx.lineWidth = 3; ctx.stroke(); ctx.fillStyle = "#C98A12"; ctx.fillRect(c.x - 2, c.y + bob - 6, 4, 12); }
+    if (e.fire && e.fire.y < VH){ const f = e.fire; ctx.fillStyle = "#FFD23F"; ctx.beginPath(); ctx.arc(f.x, f.y, f.r + 3, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = "#E3341F"; ctx.beginPath(); ctx.arc(f.x, f.y, f.r - 2, 0, Math.PI*2); ctx.fill(); }
+  }
+  for (const k of L.spikes) drawSpikes(k);
+  drawPlayer();
+  for (const p of parts){ ctx.fillStyle = p.c || "#0C0C10"; ctx.globalAlpha = Math.max(0, p.t/0.9); ctx.fillRect(p.x, p.y, p.s, p.s); }
+  ctx.globalAlpha = 1;
+  for (const f of L.effects){ ctx.strokeStyle = "rgba(123,63,228," + (f.t*2) + ")"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(f.x, f.y, 50*(1 - f.t), 0, Math.PI*2); ctx.stroke(); }
+  if (L.lavaY !== null && L.lavaY < VH) drawLava(cam.x - 20, L.lavaY, VW + 40);
+  if (msg){ ctx.fillStyle = "#1A2747"; ctx.font = "28px 'Russo One', Rubik, sans-serif"; ctx.textAlign = "center"; ctx.globalAlpha = Math.min(1, msg.t*3); ctx.fillText(msg.text, cam.x + VW/2, 120); ctx.globalAlpha = 1; }
+  ctx.restore();
+}
+function drawLava(x, y, w){
+  const t = performance.now()/300;
+  ctx.fillStyle = "#E3341F";
+  ctx.beginPath(); ctx.moveTo(x, VH);
+  for (let i = 0; i <= w; i += 16) ctx.lineTo(x + i, y + Math.sin(t + (x + i)*0.05)*4);
+  ctx.lineTo(x + w, VH); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#FFB627";
+  ctx.beginPath(); ctx.moveTo(x, y + 8);
+  for (let i = 0; i <= w; i += 16) ctx.lineTo(x + i, y + Math.sin(t + (x + i)*0.05)*4);
+  for (let i = w; i >= 0; i -= 16) ctx.lineTo(x + i, y + 7 + Math.sin(t + (x + i)*0.05)*4);
+  ctx.closePath(); ctx.fill();
+}
+
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(0.033, (now - last)/1000); last = now;
+  if (mode === "play" && L) update(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+
+/* ================= INPUT ================= */
+const KEYMAP = { ArrowLeft:"l", KeyA:"l", ArrowRight:"r", KeyD:"r", ArrowUp:"j", KeyW:"j", Space:"j" };
+window.addEventListener("keydown", e => {
+  const k = KEYMAP[e.code]; if (!k) { if (e.code === "KeyR" && mode === "play") startLevel(cur.w, cur.l); return; }
+  e.preventDefault();
+  if (k === "j" && !keys.j) jumpBuf = 0.12;
+  keys[k] = true;
+});
+window.addEventListener("keyup", e => { const k = KEYMAP[e.code]; if (k) keys[k] = false; });
+function holdBtn(id, k){
+  const b = $(id);
+  const down = e => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch(_){} if (k === "j" && !keys.j) jumpBuf = 0.12; keys[k] = true; b.classList.add("on"); };
+  const up = e => { keys[k] = false; b.classList.remove("on"); };
+  b.addEventListener("pointerdown", down); b.addEventListener("pointerup", up); b.addEventListener("pointercancel", up); b.addEventListener("lostpointercapture", up);
+  b.addEventListener("contextmenu", e => e.preventDefault());
+}
+holdBtn("bLeft", "l"); holdBtn("bRight", "r"); holdBtn("bJump", "j");
+
+/* ================= SCREENS ================= */
+const SCREENS = ["scrTitle", "scrWorlds", "scrLevels", "scrMsg", "scrCode"];
+function showScreen(id){
+  SCREENS.forEach(s => { $(s).hidden = s !== id; });
+  const playing = id === null;
+  $("hud").hidden = !playing; $("padL").hidden = !playing; $("padR").hidden = !playing;
+  if (!playing){ mode = id === "scrMsg" ? "msg" : "menu"; keys.l = keys.r = keys.j = false; }
+  if (id === "scrTitle") renderTitle();
+  fit();
+}
+function renderTitle(){
+  $("titleStats").innerHTML = "";
+  const a = document.createElement("span"); a.textContent = "Пройдено: " + progress + " из 45";
+  const b = document.createElement("span"); b.textContent = "Смертей: " + deaths;
+  $("titleStats").append(a, b);
+}
+function openWorlds(){
+  const box = $("worlds"); box.innerHTML = "";
+  WORLDS.forEach((W, i) => {
+    const open = unlockAll || progress >= i*15;
+    const done = Math.max(0, Math.min(15, progress - i*15));
+    const b = document.createElement("button"); b.className = "world"; b.disabled = !open;
+    b.innerHTML = "<em></em><b></b><span></span>";
+    b.querySelector("em").textContent = open ? "Мир " + (i + 1) + " · " + done + "/15" : "Мир " + (i + 1) + " · закрыт";
+    b.querySelector("b").textContent = W.name;
+    b.querySelector("span").textContent = W.sub;
+    b.addEventListener("click", () => openLevels(i));
+    box.appendChild(b);
+  });
+  showScreen("scrWorlds");
+}
+/* code 1235 opens every level on this device so you can jump to any one */
+$("codeBtn").addEventListener("click", () => { $("codeIn").value = ""; $("codeErr").textContent = ""; showScreen("scrCode"); setTimeout(() => $("codeIn").focus(), 50); });
+$("codeBack").addEventListener("click", () => showScreen("scrTitle"));
+$("codeForm").addEventListener("submit", e => {
+  e.preventDefault();
+  if ($("codeIn").value.trim() === "1235"){ unlockAll = true; store.set("unlockAll", true); SFX.win(); openWorlds(); }
+  else { $("codeErr").textContent = "Неверный код"; $("codeIn").value = ""; SFX.die(); }
+});
+function openLevels(w){
+  $("lvTitle").textContent = "Мир " + (w + 1) + ": " + WORLDS[w].name;
+  const box = $("levels"); box.innerHTML = "";
+  for (let i = 0; i < 15; i++){
+    const idx = w*15 + i;
+    const b = document.createElement("button"); b.className = "lv" + (idx < progress ? " done" : "") + (i === 14 ? " long" : "");
+    b.textContent = i + 1; b.disabled = !unlockAll && idx > progress;
+    if (i === 14) b.setAttribute("aria-label", "Уровень 15, длинный");
+    b.addEventListener("click", () => startLevel(w, i));
+    box.appendChild(b);
+  }
+  showScreen("scrLevels");
+}
+function showMsg(title, text, btns){
+  $("msgTitle").textContent = title; $("msgText").textContent = text;
+  const box = $("msgBtns"); box.innerHTML = "";
+  btns.forEach(([label, fn], i) => { const b = document.createElement("button"); b.className = i ? "btn ghost" : "btn"; b.textContent = label; b.addEventListener("click", fn); box.appendChild(b); });
+  showScreen("scrMsg");
+}
+let toastTm = 0;
+function toast(text, ms){ const el = $("toast"); el.textContent = text; el.hidden = false; el.style.opacity = 1; clearTimeout(toastTm); toastTm = setTimeout(() => { el.style.opacity = 0; setTimeout(() => el.hidden = true, 300); }, ms || 700); }
+/* full screen */
+const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+function updFs(){ const on = !!fsEl(); $("fsBtn").classList.toggle("on", on); $("fsBtn2").textContent = on ? "⛶ Выйти из полного экрана" : "⛶ На весь экран"; }
+async function toggleFs(){
+  const fail = () => toast("Полный экран тут не работает. Поверни телефон боком 📱", 3500);
+  try {
+    if (fsEl()){ if (document.exitFullscreen) await document.exitFullscreen(); else if (document.webkitExitFullscreen) document.webkitExitFullscreen(); }
+    else {
+      const el = document.documentElement;
+      if (el.requestFullscreen) await el.requestFullscreen({ navigationUI:"hide" });
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      else return fail();
+      try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock("landscape"); } catch(e){}
+      setTimeout(() => { if (!fsEl()) fail(); }, 700);
+    }
+  } catch(e){ fail(); }
+}
+$("fsBtn").addEventListener("click", e => { e.currentTarget.blur(); toggleFs(); });
+$("fsBtn2").addEventListener("click", toggleFs);
+document.addEventListener("fullscreenchange", () => { updFs(); setTimeout(fit, 120); });
+document.addEventListener("webkitfullscreenchange", () => { updFs(); setTimeout(fit, 120); });
+
+$("playBtn").addEventListener("click", () => {
+  if (progress === 0 && !unlockAll) startLevel(0, 0); else openWorlds();
+});
+$("toTitle").addEventListener("click", () => showScreen("scrTitle"));
+$("toWorlds").addEventListener("click", openWorlds);
+$("menuBtn").addEventListener("click", () => openLevels(cur.w));
+$("restartBtn").addEventListener("click", () => startLevel(cur.w, cur.l));
+function setSnd(on){ AU.on = on; store.set("snd", on); $("sndBtn").classList.toggle("off", !on); }
+$("sndBtn").addEventListener("click", () => setSnd(!AU.on));
+setSnd(AU.on);
+if (matchMedia("(pointer:coarse)").matches) $("keysHint").textContent = "Кнопки ← → внизу слева, прыжок справа";
+
+fit();
+showScreen("scrTitle");
+requestAnimationFrame(frame);
+window.__D = { WORLDS, startLevel, get L(){ return L; }, get P(){ return P; }, keys, setProgress(n){ progress = n; } };
+})();
+</script>
+</body></html>

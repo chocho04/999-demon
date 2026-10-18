@@ -2,6 +2,7 @@
 <html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <style>html,body{margin:0;padding:0}</style>
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png"><link rel="icon" href="icon-192.png">
 <meta name="theme-color" content="#F39032"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <title>999 Demon</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -47,11 +48,13 @@ canvas{display:block;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
 .pad button svg{width:34px;height:34px}
 .pad.r button{width:90px;height:90px}
 
-.screen{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:var(--orange);color:var(--navy);text-align:center;overflow-y:auto;padding-block:max(20px,env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.screen h1{margin:0;font:400 clamp(54px,16vw,120px)/.9 var(--f-title);letter-spacing:.02em;color:var(--navy);text-shadow:0 6px 0 rgba(0,0,0,.12)}
+.screen{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:18px;background:var(--orange);color:var(--navy);text-align:center;overflow-y:auto;padding-block:max(20px,env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.screen>:first-child{margin-top:auto}.screen>:last-child{margin-bottom:auto}
+.screen h1{margin:0;font:400 clamp(40px,min(16vw,19vh),120px)/.9 var(--f-title);letter-spacing:.02em;color:var(--navy);text-shadow:0 6px 0 rgba(0,0,0,.12)}
 .screen h1 span{display:block;font-size:.55em;letter-spacing:.18em}
 .screen h2{margin:0;font:400 clamp(26px,7vw,40px)/1.1 var(--f-title);color:var(--navy)}
 .screen p{margin:0;font:500 16px/1.4 var(--f-ui);max-width:34ch;text-wrap:balance}
+@media (max-height:520px){.screen{gap:10px}.screen p{font-size:14px}.btn{padding:11px 28px;font-size:18px}}
 .btn{border:0;border-radius:16px;background:var(--navy);color:var(--cream);font:400 22px/1 var(--f-title);padding:16px 34px;letter-spacing:.04em;box-shadow:0 6px 0 rgba(0,0,0,.25)}
 .btn:active{transform:translateY(3px);box-shadow:0 3px 0 rgba(0,0,0,.25)}
 .btn.ghost{background:transparent;color:var(--navy);box-shadow:inset 0 0 0 3px var(--navy);font-size:17px;padding:12px 22px}
@@ -1510,4 +1513,5 @@ requestAnimationFrame(frame);
 window.__D = { WORLDS, startLevel, get L(){ return L; }, get P(){ return P; }, keys, setProgress(n){ progress = n; } };
 })();
 </script>
+<script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));</script>
 </body></html>

@@ -111,7 +111,7 @@ canvas{display:block;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
   <button class="btn ghost" id="codeBtn" style="font-size:14px;padding:9px 18px">Код</button>
   <button class="btn ghost" id="fsBtn2" style="font-size:14px;padding:9px 18px">⛶ На весь экран</button>
   <p style="font-size:13px;opacity:.75" id="keysHint">Управление: ← → и пробел (или кнопки на экране)</p>
-  <p style="font-size:11px;opacity:.5;margin-top:4px" id="verLbl">версия <span id="gameVer">2026-10-18.1</span></p>
+  <p style="font-size:11px;opacity:.5;margin-top:4px" id="verLbl">версия <span id="gameVer">2026-10-18.2</span></p>
 </div>
 <div class="screen" id="scrWorlds" hidden>
   <h2>Выбери мир</h2>
@@ -281,10 +281,46 @@ const W3 = [
     { t:"pair", a:[76,6], b:[80] },
     { t:"cube", at:82, spawn:86, door:[93], speed:170 } ] }
 ];
+/* ---------- secret world: every level = three levels from three worlds glued together (3x longer) ---------- */
+const PT_KEYS = ["x", "x0", "x1", "at", "atL", "stop", "cube"];
+const PT_ARR1 = ["a", "b", "real", "door", "sp", "gun"];      // [x, y] points
+const PT_ARR2 = ["pit", "floor", "spring"];                   // [x0, x1] ranges
+function shiftTrap(tr, off){
+  const t = JSON.parse(JSON.stringify(tr));
+  for (const k of PT_KEYS) if (typeof t[k] === "number") t[k] += off;
+  if (typeof t.to === "number") t.to += off; else if (Array.isArray(t.to)) t.to[0] += off;
+  for (const k of PT_ARR1) if (Array.isArray(t[k])) t[k][0] += off;
+  for (const k of PT_ARR2) if (Array.isArray(t[k])) { t[k][0] += off; t[k][1] += off; }
+  if (t.t === "chase" && t.stop === undefined) t.stop = off + 24;
+  if (t.t === "bounce"){ t.lo = off; t.hi = off + 24; }
+  return t;
+}
+function glue(parts){
+  const out = { w:0, gaps:[], blocks:[], spikes:[], traps:[] };
+  parts.forEach((d, i) => {
+    const off = out.w, w = d.w || 24;
+    if (i === 0 && d.spawn) out.spawn = [d.spawn[0] + off, d.spawn[1]];
+    for (const g of d.gaps || []) out.gaps.push([g[0] + off, g[1] + off]);
+    for (const b of d.blocks || []) out.blocks.push([b[0] + off, b[1], b[2], b[3]]);
+    for (const k of d.spikes || []) out.spikes.push([k[0] + off, k[1], k[2]]);
+    for (const tr of d.traps || []) out.traps.push(shiftTrap(tr, off));
+    out.w += w;
+    if (i === parts.length - 1) out.door = d.door ? [d.door[0] + off, d.door[1]] : [out.w - 2];
+  });
+  return out;
+}
+const SP1 = [0, 2, 4, 5, 7, 8, 9, 10, 11, 12], SP2 = [0, 1, 3, 9, 10], SP3 = [0, 1, 2, 3, 4, 6, 7, 8, 10];
+const W4 = [];
+for (let k = 0; k < 15; k++){
+  const a = W1[SP1[k % 10]], b = W2[SP2[k % 5]], c = W3[SP3[(k*2) % 9]];
+  const order = [[a, b, c], [b, c, a], [c, a, b]][k % 3];
+  W4.push(glue(order));
+}
 const WORLDS = [
   { name:"Порталы", sub:"Порталы-обманки и проваливающийся пол", levels:W1 },
   { name:"Лава и мячи", sub:"Лава, огонь, мячи и хитрые двери", levels:W2 },
-  { name:"Финал", sub:"Падающие платформы, стены и давилки", levels:W3 }
+  { name:"Финал", sub:"Падающие платформы, стены и давилки", levels:W3 },
+  { name:"Секретный мир", sub:"Все ловушки всех миров вместе. Уровни в 3 раза длиннее", levels:W4, secret:true }
 ];
 
 /* ================= SOUND ================= */
@@ -350,6 +386,10 @@ let cur = { w:0, l:0 };
 let deaths = store.get("deaths", 0);
 let progress = store.get("progress", 0);   // number of levels beaten, 0..45
 let unlockAll = store.get("unlockAll", false);
+let progress4 = store.get("progress4", 0);   // secret world levels beaten, 0..15
+let skeys = store.get("skeys", {});          // secret keys found: { "w-l": true }
+const skeyCount = () => Object.keys(skeys).length;
+const secretOpen = () => unlockAll || skeyCount() >= 45;
 let mode = "title";
 
 function rect(x, y, w, h){ return { x, y, w, h }; }
@@ -379,6 +419,32 @@ function build(desc){
   S.spawn = { x:sp[0]*T + 8, y:(sp[1] || GY)*T - 34 };
   for (const tr of traps) S.ents.push(makeTrap(tr, S, add));
   return S;
+}
+/* every level of worlds 1-3 hides a secret room behind a fake wall at the edge; inside is a secret key */
+function addSecret(S, w, l){
+  let fx = S.door.x/T;
+  for (const e of S.ents){ const t = e.tr;
+    if ((t.t === "doorMove" || t.t === "doorRun" || t.t === "doorDrop") && t.to !== undefined) fx = Array.isArray(t.to) ? t.to[0] : t.to;
+    if (t.t === "doorFake") fx = t.real[0];
+    if (t.t === "cube") fx = t.door[0]; }
+  const right = fx < 5, W = S.W/T, id = w + "-" + l, kind = (w*15 + l) % 4;
+  const rx = right ? W + 1 : -5;            // room spans rx .. rx+4
+  S.solids.push({ x:(right ? W : -5)*T, y:GY*T, w:5*T, h:3*T, on:true, vy:0, dyn:false });
+  if (right){ S.maxX = (W + 5)*T; S.camHi = T; S.fake = { x:W*T, w:T }; }
+  else { S.minX = -5*T; S.camLo = -T; S.fake = { x:-T, w:T }; }
+  S.room = { x:rx*T, w:4*T };
+  let kx = rx + 2, ky = GY - 0.6;
+  if (kind === 1){ S.solids.push({ x:(rx + 1)*T, y:9*T, w:2*T, h:T, on:true, vy:0, dyn:false }); ky = 8.4; }
+  if (kind === 2){ S.spikes.push({ x:(rx + 1.5)*T, y:GY*T - 20, w:T, h:20, up:true }); kx = right ? rx + 3.4 : rx + 0.6; }
+  if (kind === 3){ ky = 7.9; }
+  const k = { x:kx*T, y:ky*T, got:false, old:!!skeys[id] };
+  S.ents.push({ tr:{ t:"skey" }, skey:k, upd:() => {
+    if (!k.got && ov(P, { x:k.x - 12, y:k.y - 16, w:24, h:32 })){
+      k.got = true;
+      if (!skeys[id]){ skeys[id] = true; store.set("skeys", skeys); SFX.key(); setTimeout(() => SFX.win(), 200);
+        say(skeyCount() >= 45 ? "Все 45 ключей! Открыт СЕКРЕТНЫЙ МИР!" : "Секретный ключ! " + skeyCount() + "/45", 2); }
+      else say("Этот ключ у тебя уже есть", 1.2);
+    } } });
 }
 function trig(tr, S){
   if (tr.flag && !S.flags[tr.flag]) return false;
@@ -517,7 +583,7 @@ function makeTrap(tr, S, add){
             e.balls.push({ x:tr.x*T + 20, y:-40, vx:0, vy:0, r, drop:true, rot:0, bounced:0, burst:!!tr.burst });
             SFX.trap();
           } else {
-            e.balls.push({ x:tr.x*T, y:tr.y*T, vx:tr.vx, vy:0, r:20, bounce:true, h:(GY - tr.y + 1.5)*T, rot:0 });
+            e.balls.push({ x:tr.x*T, y:tr.y*T, vx:tr.vx, vy:0, r:20, bounce:true, h:(GY - tr.y + 1.5)*T, rot:0, lo:(tr.lo || 0)*T, hi:tr.hi ? tr.hi*T : S.W });
           }
         }
         for (const b of e.balls){
@@ -531,7 +597,7 @@ function makeTrap(tr, S, add){
             else if (b.drop && b.bounced < 1){ b.vy = -b.vy*0.45; b.bounced++; if (!b.vx) b.vx = (P.x < b.x ? -1 : 1)*220; }
             else b.vy = 0;
           }
-          if (b.bounce && (b.x < b.r || b.x > S.W - b.r)) b.vx = -b.vx;
+          if (b.bounce && ((b.x < b.lo + b.r && b.vx < 0) || (b.x > b.hi - b.r && b.vx > 0))) b.vx = -b.vx;
           if (circleHit(b.x, b.y, b.r - 3)) kill("ball");
         }
         e.balls = e.balls.filter(b => !b.gone && b.y < VH + 80 && b.x > cam.x - 300 && b.x < cam.x + VW + 300);
@@ -1089,10 +1155,11 @@ function startLevel(w, l){
   cur = { w, l };
   const desc = WORLDS[w].levels[l];
   L = build(desc.gen ? desc.gen(loopN) : desc);
+  if (w < 3) addSecret(L, w, l);
   P = { x:L.spawn.x, y:L.spawn.y, w:24, h:34, vx:0, vy:0, onGround:false, ground:null, coyote:0, face:1, walk:0, cool:0, dead:false };
-  cam.x = Math.max(0, Math.min(P.x - VW/2, L.W - VW));
+  cam.x = camTarget();
   deadT = 0; winT = 0; parts = []; jumpBuf = 0; msg = null;
-  $("hudLv").textContent = "Мир " + (w + 1) + " · " + (l + 1) + "/15" + (l === 14 ? " · длинный" : "");
+  $("hudLv").textContent = (w === 3 ? "Секретный мир" : "Мир " + (w + 1)) + " · " + (l + 1) + "/15" + (l === 14 && w < 3 ? " · длинный" : "");
   $("hudD").textContent = deaths;
   mode = "play";
   showScreen(null);
@@ -1106,6 +1173,11 @@ function kill(why){
   SFX.die();
 }
 function solids(){ return L.solids.filter(s => s.on); }
+function camTarget(){
+  const lo = P.x < 0 ? (L.minX || 0) : (L.camLo || 0);
+  const hi = P.x + P.w > L.W ? (L.maxX || L.W) - VW : L.W - VW + (L.camHi || 0);
+  return Math.max(lo, Math.min(P.x + P.w/2 - VW/2, hi));
+}
 function moveAxis(dx, dy){
   const list = solids();
   P.x += dx;
@@ -1160,7 +1232,7 @@ function update(dt){
   }
   // pushed by a rising solid
   for (const s of solids()){ if (ov(P, s) && s.dyn){ if (s.press){ kill("crush"); } else { P.y = s.y - P.h; P.vy = 0; } } }
-  P.x = Math.max(0, Math.min(L.W - P.w, P.x));
+  P.x = Math.max(L.minX || 0, Math.min((L.maxX || L.W) - P.w, P.x));
   if (P.onGround && !P.wasG && P.lastVy > 250) SFX.land();
   P.wasG = P.onGround; P.lastVy = P.vy > 0 ? P.vy : (P.onGround ? P.lastVy : 0);
   if (P.onGround && Math.abs(P.vx) > 20){ const before = Math.floor(P.walk/Math.PI); P.walk += dt*14; if (Math.floor(P.walk/Math.PI) !== before) SFX.step(); } else P.walk = 0;
@@ -1180,15 +1252,20 @@ function update(dt){
       setTimeout(() => { if (!L || !ft) return; D.x = ft.real[0]*T + 4; D.y = (ft.real[1] || GY)*T - 60; D.vis = true; L.doorEvent = L.time; L.effects.push({ x:D.x + 16, y:D.y + 30, t:0.6 }); }, 650);
     } else if (!P.dead){ winT = 0.6; P.alpha = 1; SFX.win(); }
   }
-  cam.x += ((Math.max(0, Math.min(P.x + P.w/2 - VW/2, L.W - VW))) - cam.x)*Math.min(1, dt*8);
+  cam.x += (camTarget() - cam.x)*Math.min(1, dt*8);
 }
 function levelDone(){
+  if (cur.w === 3){
+    if (cur.l + 1 > progress4){ progress4 = cur.l + 1; store.set("progress4", progress4); }
+    if (cur.l === 14){ mode = "msg"; showMsg("Секретный мир пройден!", "Ты настоящий повелитель 999 Demon! Смертей за всё время: " + deaths + ".", [["В меню", () => showScreen("scrTitle")]]); return; }
+    toast("Пройдено!"); startLevel(3, cur.l + 1); return;
+  }
   const idx = cur.w*15 + cur.l + 1;
   if (idx > progress){ progress = idx; store.set("progress", progress); }
   if (cur.l === 14){
     mode = "msg";
     if (cur.w === 2){
-      showMsg("Ты победил 999 Demon!", "Все 45 уровней пройдены. Смертей за всё время: " + deaths + ".", [["В меню", () => showScreen("scrTitle")]]);
+      showMsg("Ты победил 999 Demon!", "Все 45 уровней пройдены. Смертей за всё время: " + deaths + ". Секретных ключей: " + skeyCount() + "/45" + (secretOpen() ? " — секретный мир открыт!" : ". В каждом уровне есть тайная комната…"), [["В меню", () => showScreen("scrTitle")]]);
     } else {
       showMsg("Мир " + (cur.w + 1) + " пройден!", "Открыт мир " + (cur.w + 2) + ": «" + WORLDS[cur.w + 1].name + "».", [["Дальше", () => startLevel(cur.w + 1, 0)], ["К мирам", () => openWorlds()]]);
     }
@@ -1217,7 +1294,7 @@ window.addEventListener("resize", fit);
 
 function drawBg(){
   const g = ctx.createLinearGradient(0, 0, 0, VH);
-  g.addColorStop(0, "#F7A548"); g.addColorStop(1, "#EB7A22");
+  if (cur.w === 3){ g.addColorStop(0, "#B565D8"); g.addColorStop(1, "#6E2FA8"); } else { g.addColorStop(0, "#F7A548"); g.addColorStop(1, "#EB7A22"); }
   ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
   ctx.fillStyle = "rgba(255,240,210,.12)";
   for (let i = 0; i < 6; i++){
@@ -1283,6 +1360,7 @@ function draw(){
   drawBg();
   if (!L) return;
   ctx.save(); ctx.translate(-Math.round(cam.x), 0);
+  if (L.room){ ctx.fillStyle = "rgba(60,20,90,.22)"; ctx.fillRect(L.room.x, 0, L.room.w, GY*T); }
   for (const e of L.ents){
     if (e.lava){ drawLava(e.lava.x, e.lava.y, e.lava.w); }
   }
@@ -1344,6 +1422,10 @@ function draw(){
       ctx.fillStyle = "#1A2747"; ctx.fillRect(-20, -34, 40, 64); ctx.fillStyle = "#FFE2A8"; ctx.fillRect(-16, -30, 32, 60); ctx.fillStyle = "#F7B65A"; ctx.fillRect(-12, -24, 24, 50);
       const lk = Math.max(-3, Math.min(3, (P.x - D.x)/60)); ctx.fillStyle = "#FFF4E2"; ctx.fillRect(-11, -16, 9, 9); ctx.fillRect(3, -16, 9, 9); ctx.fillStyle = "#0C0C10"; ctx.fillRect(-9 + lk, -13, 4, 5); ctx.fillRect(5 + lk, -13, 4, 5);
       ctx.fillStyle = "#1A2747"; ctx.fillRect(-6, 4, 12, 3); ctx.restore(); }
+    if (e.skey && !e.skey.got){ const k = e.skey, bob = Math.sin(performance.now()/250)*3; ctx.save(); ctx.translate(k.x, k.y + bob); ctx.globalAlpha = k.old ? 0.4 : 1;
+      ctx.fillStyle = "rgba(190,140,255,.5)"; ctx.beginPath(); ctx.arc(0, 0, 22 + Math.sin(performance.now()/180)*3, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = "#C9A2FF"; ctx.strokeStyle = "#5B2A9E"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, -8, 8, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.fillRect(-2.5, -1, 5, 16); ctx.fillRect(2, 8, 6, 3); ctx.fillRect(2, 12, 5, 3); ctx.fillStyle = "#5B2A9E"; ctx.beginPath(); ctx.arc(0, -8, 3, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
     if (e.btn){ const b = e.btn; ctx.fillStyle = b.down ? "#2E9D4F" : "#E3341F"; ctx.fillRect(b.x + (b.down ? 5 : 0), b.y, b.down ? 4 : b.w, b.h); ctx.fillStyle = "#1A2747"; ctx.fillRect(b.x + b.w - 2, b.y - 3, 4, b.h + 6); }
     if (e.cspring){ const r = e.cspring.r, sq = e.cspring.squash*8;
       ctx.fillStyle = "rgba(123,63,228,.12)"; ctx.fillRect(L.grav[0], 0, L.grav[1] - L.grav[0], VH);
@@ -1367,6 +1449,8 @@ function draw(){
   }
   for (const k of L.spikes) drawSpikes(k);
   drawPlayer();
+  if (L.fake){ const f = L.fake; ctx.fillStyle = "#1A2747"; ctx.fillRect(f.x, 0, f.w, GY*T); ctx.fillStyle = "#2A3B66"; for (let y = 20; y < GY*T; y += 80) ctx.fillRect(f.x + 6, y, f.w - 12, 3);
+    ctx.strokeStyle = "rgba(255,244,226,.18)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(f.x + 14, 300); ctx.lineTo(f.x + 22, 322); ctx.lineTo(f.x + 16, 340); ctx.lineTo(f.x + 25, 360); ctx.stroke(); }
   for (const p of parts){ ctx.fillStyle = p.c || "#0C0C10"; ctx.globalAlpha = Math.max(0, p.t/0.9); ctx.fillRect(p.x, p.y, p.s, p.s); }
   ctx.globalAlpha = 1;
   for (const f of L.effects){ ctx.strokeStyle = "rgba(123,63,228," + (f.t*2) + ")"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(f.x, f.y, 50*(1 - f.t), 0, Math.PI*2); ctx.stroke(); }
@@ -1427,16 +1511,26 @@ function renderTitle(){
   $("titleStats").innerHTML = "";
   const a = document.createElement("span"); a.textContent = "Пройдено: " + progress + " из 45";
   const b = document.createElement("span"); b.textContent = "Смертей: " + deaths;
-  $("titleStats").append(a, b);
+  const c = document.createElement("span"); c.textContent = "🔑 " + skeyCount() + "/45";
+  $("titleStats").append(a, b, c);
 }
 function openWorlds(){
   const box = $("worlds"); box.innerHTML = "";
   WORLDS.forEach((W, i) => {
-    const open = unlockAll || progress >= i*15;
-    const done = Math.max(0, Math.min(15, progress - i*15));
+    if (W.secret && !secretOpen()){
+      const b = document.createElement("button"); b.className = "world"; b.disabled = true;
+      b.innerHTML = "<em></em><b></b><span></span>";
+      b.querySelector("em").textContent = "??? · 🔑 " + skeyCount() + "/45";
+      b.querySelector("b").textContent = "Секретный мир";
+      b.querySelector("span").textContent = "Найди секретные ключи во всех 45 уровнях";
+      box.appendChild(b); return;
+    }
+    const open = W.secret ? true : (unlockAll || progress >= i*15);
+    const done = W.secret ? progress4 : Math.max(0, Math.min(15, progress - i*15));
     const b = document.createElement("button"); b.className = "world"; b.disabled = !open;
     b.innerHTML = "<em></em><b></b><span></span>";
-    b.querySelector("em").textContent = open ? "Мир " + (i + 1) + " · " + done + "/15" : "Мир " + (i + 1) + " · закрыт";
+    b.querySelector("em").textContent = W.secret ? "Секретный · " + done + "/15" : (open ? "Мир " + (i + 1) + " · " + done + "/15" : "Мир " + (i + 1) + " · закрыт");
+    if (W.secret) b.style.background = "#5B2A9E";
     b.querySelector("b").textContent = W.name;
     b.querySelector("span").textContent = W.sub;
     b.addEventListener("click", () => openLevels(i));
@@ -1453,12 +1547,14 @@ $("codeForm").addEventListener("submit", e => {
   else { $("codeErr").textContent = "Неверный код"; $("codeIn").value = ""; SFX.die(); }
 });
 function openLevels(w){
-  $("lvTitle").textContent = "Мир " + (w + 1) + ": " + WORLDS[w].name;
+  $("lvTitle").textContent = (w === 3 ? "" : "Мир " + (w + 1) + ": ") + WORLDS[w].name;
   const box = $("levels"); box.innerHTML = "";
   for (let i = 0; i < 15; i++){
     const idx = w*15 + i;
-    const b = document.createElement("button"); b.className = "lv" + (idx < progress ? " done" : "") + (i === 14 ? " long" : "");
-    b.textContent = i + 1; b.disabled = !unlockAll && idx > progress;
+    const done = w === 3 ? i < progress4 : idx < progress, locked = w === 3 ? (!unlockAll && i > progress4) : (!unlockAll && idx > progress);
+    const b = document.createElement("button"); b.className = "lv" + (done ? " done" : "") + (i === 14 || w === 3 ? " long" : "");
+    b.textContent = i + 1; b.disabled = locked;
+    if (w < 3 && skeys[w + "-" + i]) b.textContent += "🔑";
     if (i === 14) b.setAttribute("aria-label", "Уровень 15, длинный");
     b.addEventListener("click", () => startLevel(w, i));
     box.appendChild(b);

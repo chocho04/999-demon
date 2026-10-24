@@ -111,7 +111,7 @@ canvas{display:block;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
   <button class="btn ghost" id="codeBtn" style="font-size:14px;padding:9px 18px">Код</button>
   <button class="btn ghost" id="fsBtn2" style="font-size:14px;padding:9px 18px">⛶ На весь экран</button>
   <p style="font-size:13px;opacity:.75" id="keysHint">Управление: ← → и пробел (или кнопки на экране)</p>
-  <p style="font-size:11px;opacity:.5;margin-top:4px" id="verLbl">версия <span id="gameVer">2026-10-18.2</span></p>
+  <p style="font-size:11px;opacity:.5;margin-top:4px" id="verLbl">версия <span id="gameVer">2026-10-24.1</span></p>
 </div>
 <div class="screen" id="scrWorlds" hidden>
   <h2>Выбери мир</h2>
@@ -421,24 +421,59 @@ function build(desc){
   return S;
 }
 /* every level of worlds 1-3 hides a secret room behind a fake wall at the edge; inside is a secret key */
-function addSecret(S, w, l){
-  let fx = S.door.x/T;
-  for (const e of S.ents){ const t = e.tr;
-    if ((t.t === "doorMove" || t.t === "doorRun" || t.t === "doorDrop") && t.to !== undefined) fx = Array.isArray(t.to) ? t.to[0] : t.to;
-    if (t.t === "doorFake") fx = t.real[0];
-    if (t.t === "cube") fx = t.door[0]; }
-  const right = fx < 5, W = S.W/T, id = w + "-" + l, kind = (w*15 + l) % 4;
-  const rx = right ? W + 1 : -5;            // room spans rx .. rx+4
-  S.solids.push({ x:(right ? W : -5)*T, y:GY*T, w:5*T, h:3*T, on:true, vy:0, dyn:false });
-  if (right){ S.maxX = (W + 5)*T; S.camHi = T; S.fake = { x:W*T, w:T }; }
-  else { S.minX = -5*T; S.camLo = -T; S.fake = { x:-T, w:T }; }
-  S.room = { x:rx*T, w:4*T };
-  let kx = rx + 2, ky = GY - 0.6;
-  if (kind === 1){ S.solids.push({ x:(rx + 1)*T, y:9*T, w:2*T, h:T, on:true, vy:0, dyn:false }); ky = 8.4; }
-  if (kind === 2){ S.spikes.push({ x:(rx + 1.5)*T, y:GY*T - 20, w:T, h:20, up:true }); kx = right ? rx + 3.4 : rx + 0.6; }
-  if (kind === 3){ ky = 7.9; }
-  const k = { x:kx*T, y:ky*T, got:false, old:!!skeys[id] };
+/* every level of worlds 1-3 hides a secret: invisible blocks in the air (jump into them from below to make them
+   appear) lead up to a secret key high in the sky. The spot is picked per level in a calm place, never at the edges. */
+function secretSpot(d, W, id){
+  // ground[]: places with danger on the floor; air[]: places where something is up in the air
+  const n = Math.ceil(W) + 2, ground = new Array(n).fill(false), air = new Array(n).fill(false);
+  const mark = (arr, a, b) => { for (let i = Math.max(0, Math.floor(a)); i < Math.min(n, Math.ceil(b)); i++) arr[i] = true; };
+  const G = (a, b) => mark(ground, a, b), A = (a, b) => mark(air, a, b);
+  for (const g of d.gaps || []) G(g[0], g[1]);
+  for (const b of d.blocks || []) (b[1] < GY - 1.5 ? A : G)(b[0], b[0] + b[2]);
+  for (const k of d.spikes || []) G(k[0], k[0] + k[1]);
+  const sp = (d.spawn || [1])[0], dr = (d.door || [W - 2])[0]; G(sp - 1, sp + 1); G(dr, dr + 1);
+  for (const t of d.traps || []){
+    const x = t.x, wd = t.w || t.n || 1;
+    if (typeof x === "number"){
+      if (t.y !== undefined && t.y < GY - 1) A(x - 0.5, x + wd + 0.5); else G(x - 0.5, x + wd + 0.5);
+      if (["fire", "crush", "shut", "ceil", "dropPortal", "riseWall", "bounce", "drop"].includes(t.t)) A(x - 1, x + wd + 1);
+    }
+    for (const k of ["a", "b"]) if (Array.isArray(t[k])) (t[k][1] && t[k][1] < GY - 1 ? A : G)(t[k][0] - 0.5, t[k][0] + 1.5);
+    for (const k of ["real", "door", "sp", "gun"]) if (Array.isArray(t[k])) A(t[k][0] - 1, t[k][0] + 2);
+    if (Array.isArray(t.to)) G(t.to[0] - 1, t.to[0] + 2);
+    for (const k of ["pit", "floor", "spring"]) if (Array.isArray(t[k])) G(t[k][0], t[k][1]);
+    if (Array.isArray(t.xs)){ G(Math.min(...t.xs) - 1, Math.max(...t.xs) + 2); A(Math.min(...t.xs) - 1, Math.max(...t.xs) + 2); }
+    if (typeof t.wall === "number"){ G(t.wall, t.wall + 1); A(t.wall, t.wall + 1); }
+    if (Array.isArray(t.spikes)) t.spikes.forEach(r => A(r[0], r[1]));
+    if (t.t === "grav" || t.t === "slow") { A(t.x0, t.x1); }
+    if (t.t === "press" || t.t === "skyChase"){ const a = Math.min(t.x0, t.to ?? t.stop), b = Math.max(t.x0, t.to ?? t.stop); A(a, b); G(a, b); }
+    if (t.t === "shiftHole" || t.t === "shiftSpike") G(t.x, t.x + wd + t.shift + 1);
+    if (t.t === "boss") { A(t.x - 20, t.x + 3); }
+  }
+  let h = 7; for (const c of id) h = (h*31 + c.charCodeAt(0)) >>> 0;
+  const free = (arr, a, b) => { for (let i = Math.max(0, Math.floor(a)); i < Math.min(n, Math.ceil(b)); i++) if (arr[i]) return false; return true; };
+  for (const [lo, hi] of [[0.28, 0.92], [0.15, 0.97], [0.05, 1]]){
+    const wins = [];
+    for (let x = Math.max(2, Math.ceil(W*lo)); x + 7.5 <= W*hi; x++)
+      if (free(ground, x - 1.5, x + 4.5) && free(air, x - 0.5, x + 7.5)) wins.push(x);
+    if (wins.length) return wins[h % wins.length];
+  }
+  return null;
+}
+function addSecret(S, w, l, d){
+  const W = S.W/T, id = w + "-" + l;
+  let x = secretSpot(d, W, id);
+  const kind = (w*15 + l) % 4, left = kind % 2 === 1;      // stairs go right or left; ledge or a floating key
+  if (x === null) x = Math.max(3, Math.min(W - 10, Math.round(W*(0.35 + ((w*7 + l*5) % 10)/25))));
+  // right-going: block1 x..x+2 (row 8.7), block2 x+2.5..x+4.5 (row 6.7), ledge x+5..x+7 (row 4.4)
+  const m = v => left ? x + 7 - v : x + v;                  // mirror for left-going stairs
+  const box = (a, b, y, h) => ({ x:Math.min(m(a), m(b))*T, y:y*T, w:Math.abs(b - a)*T, h:h*T });
+  const hb = [box(0, 2, 8.7, 1), box(2.5, 4.5, 6.7, 1)].map(r => { const s = Object.assign(r, { on:false, vy:0, dyn:false, hidden:true }); S.solids.push(s); return s; });
+  if (kind < 2) S.solids.push(Object.assign(box(5, 7, 4.4, 0.4), { on:true, vy:0, dyn:false }));
+  S.secretAt = x;
+  const k = { x:m(6)*T, y:kind < 2 ? 4.4*T - 20 : 4.9*T, got:false, old:!!skeys[id] };
   S.ents.push({ tr:{ t:"skey" }, skey:k, upd:() => {
+    for (const s of hb) if (!s.on && P.vy < 0 && ov(P, s)){ s.on = true; P.y = s.y + s.h; P.vy = 0; tone(520, 0.08, { vol:0.07 }); tone(780, 0.1, { vol:0.06, delay:0.06 }); S.effects.push({ x:s.x + s.w/2, y:s.y + 20, t:0.4 }); }
     if (!k.got && ov(P, { x:k.x - 12, y:k.y - 16, w:24, h:32 })){
       k.got = true;
       if (!skeys[id]){ skeys[id] = true; store.set("skeys", skeys); SFX.key(); setTimeout(() => SFX.win(), 200);
@@ -1154,8 +1189,9 @@ function startLevel(w, l){
   if (mode !== "play" || cur.w !== w || cur.l !== l) loopN = 1;
   cur = { w, l };
   const desc = WORLDS[w].levels[l];
-  L = build(desc.gen ? desc.gen(loopN) : desc);
-  if (w < 3) addSecret(L, w, l);
+  const d0 = desc.gen ? desc.gen(loopN) : desc;
+  L = build(d0);
+  if (w < 3) addSecret(L, w, l, d0);
   P = { x:L.spawn.x, y:L.spawn.y, w:24, h:34, vx:0, vy:0, onGround:false, ground:null, coyote:0, face:1, walk:0, cool:0, dead:false };
   cam.x = camTarget();
   deadT = 0; winT = 0; parts = []; jumpBuf = 0; msg = null;
@@ -1304,6 +1340,7 @@ function drawBg(){
 }
 function blockRect(s){
   const sh = s.shake ? (Math.random() - 0.5)*4 : 0;
+  if (s.hidden){ ctx.fillStyle = "#5B2A9E"; ctx.fillRect(s.x, s.y, s.w, s.h); ctx.fillStyle = "#C9A2FF"; ctx.font = "bold 24px sans-serif"; ctx.textAlign = "center"; ctx.fillText("?", s.x + s.w/2, s.y + 29); return; }
   ctx.fillStyle = "#1A2747"; ctx.fillRect(s.x + sh, s.y, s.w, s.h);
   ctx.fillStyle = "#2A3B66"; ctx.fillRect(s.x + sh, s.y, s.w, Math.min(6, s.h));
 }
@@ -1360,7 +1397,6 @@ function draw(){
   drawBg();
   if (!L) return;
   ctx.save(); ctx.translate(-Math.round(cam.x), 0);
-  if (L.room){ ctx.fillStyle = "rgba(60,20,90,.22)"; ctx.fillRect(L.room.x, 0, L.room.w, GY*T); }
   for (const e of L.ents){
     if (e.lava){ drawLava(e.lava.x, e.lava.y, e.lava.w); }
   }
@@ -1449,8 +1485,6 @@ function draw(){
   }
   for (const k of L.spikes) drawSpikes(k);
   drawPlayer();
-  if (L.fake){ const f = L.fake; ctx.fillStyle = "#1A2747"; ctx.fillRect(f.x, 0, f.w, GY*T); ctx.fillStyle = "#2A3B66"; for (let y = 20; y < GY*T; y += 80) ctx.fillRect(f.x + 6, y, f.w - 12, 3);
-    ctx.strokeStyle = "rgba(255,244,226,.18)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(f.x + 14, 300); ctx.lineTo(f.x + 22, 322); ctx.lineTo(f.x + 16, 340); ctx.lineTo(f.x + 25, 360); ctx.stroke(); }
   for (const p of parts){ ctx.fillStyle = p.c || "#0C0C10"; ctx.globalAlpha = Math.max(0, p.t/0.9); ctx.fillRect(p.x, p.y, p.s, p.s); }
   ctx.globalAlpha = 1;
   for (const f of L.effects){ ctx.strokeStyle = "rgba(123,63,228," + (f.t*2) + ")"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(f.x, f.y, 50*(1 - f.t), 0, Math.PI*2); ctx.stroke(); }

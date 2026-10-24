@@ -110,8 +110,9 @@ canvas{display:block;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
   <button class="btn" id="playBtn">ИГРАТЬ</button>
   <button class="btn ghost" id="codeBtn" style="font-size:14px;padding:9px 18px">Код</button>
   <button class="btn ghost" id="fsBtn2" style="font-size:14px;padding:9px 18px">⛶ На весь экран</button>
+  <button class="btn ghost" id="resetBtn" style="font-size:13px;padding:7px 14px;opacity:.8">↺ Сбросить прогресс</button>
   <p style="font-size:13px;opacity:.75" id="keysHint">Управление: ← → и пробел (или кнопки на экране)</p>
-  <p style="font-size:11px;opacity:.5;margin-top:4px" id="verLbl">версия <span id="gameVer">2026-10-24.1</span></p>
+  <p style="font-size:11px;opacity:.5;margin-top:4px" id="verLbl">версия <span id="gameVer">2026-10-24.2</span></p>
 </div>
 <div class="screen" id="scrWorlds" hidden>
   <h2>Выбери мир</h2>
@@ -1595,6 +1596,17 @@ function openLevels(w){
   }
   showScreen("scrLevels");
 }
+/* reset everything: levels, secret keys, deaths and the 1235 unlock (sound setting stays) */
+$("resetBtn").addEventListener("click", () => {
+  showMsg("Сбросить весь прогресс?", "Пройденные уровни, секретные ключи и смерти обнулятся, а код 1235 нужно будет ввести заново. Это нельзя отменить.", [
+    ["Да, сбросить", () => {
+      progress = 0; progress4 = 0; deaths = 0; skeys = {}; unlockAll = false;
+      store.set("progress", 0); store.set("progress4", 0); store.set("deaths", 0); store.set("skeys", {}); store.set("unlockAll", false);
+      SFX.die(); showScreen("scrTitle"); toast("Прогресс сброшен", 1500);
+    }],
+    ["Отмена", () => showScreen("scrTitle")]
+  ]);
+});
 function showMsg(title, text, btns){
   $("msgTitle").textContent = title; $("msgText").textContent = text;
   const box = $("msgBtns"); box.innerHTML = "";

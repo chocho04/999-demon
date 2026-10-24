@@ -112,7 +112,7 @@ canvas{display:block;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
   <button class="btn ghost" id="fsBtn2" style="font-size:14px;padding:9px 18px">⛶ На весь экран</button>
   <button class="btn ghost" id="resetBtn" style="font-size:13px;padding:7px 14px;opacity:.8">↺ Сбросить прогресс</button>
   <p style="font-size:13px;opacity:.75" id="keysHint">Управление: ← → и пробел (или кнопки на экране)</p>
-  <p style="font-size:11px;opacity:.5;margin-top:4px" id="verLbl">версия <span id="gameVer">2026-10-24.2</span></p>
+  <p style="font-size:11px;opacity:.5;margin-top:4px" id="verLbl">версия <span id="gameVer">2026-10-24.3</span></p>
 </div>
 <div class="screen" id="scrWorlds" hidden>
   <h2>Выбери мир</h2>
@@ -155,7 +155,7 @@ const store = {
    spikes:[[x,n,row]]. door:[x,row]. traps: see build(). */
 const W1 = [
   { traps:[{ t:"collapse", x:11, w:2, at:10 }, { t:"pop", x:16, n:1, at:15 }] },
-  { blocks:[[14,8,2,1]], traps:[{ t:"shiftHole", x:6, w:2, shift:2.5, at:4.2 }, { t:"ceil", x:11, n:9, at:11 }, { t:"super", x0:11, x1:20 }, { t:"coin", x:15, y:8 }] },
+  { blocks:[[14,8,2,1]], traps:[{ t:"shiftHole", x:6, w:2, shift:3.5, at:4.2 }, { t:"ceil", x:11, n:9, at:11 }, { t:"super", x0:11, x1:20 }, { t:"coin", x:15, y:8 }] },
   { spikes:[[19,1]], traps:[{ t:"collapse", x:4, w:2, at:3.3 }, { t:"shiftSpike", x:9, n:1, at:7.6, shift:2 }, { t:"dropPortal", x:15, at:13, to:[4.6,8] }] },
   { spawn:[0.4], traps:[{ t:"pair", a:[2], b:[8.2] }, { t:"squeeze", a:4.5, b:11, ta:7.4, tb:8.6, speed:95, after:"portal", delay:0.45 }, { t:"riseWall", x:13, w:5, land:true, delay:0.5, h:4, aim:8.8 }, { t:"fakePortal", x:18.5, pit:[18,20], sp:[20.1,1.5], to:[21.2] }] },
   { gaps:[[12,14]], traps:[{ t:"trapP", x:7, hidden:true }, { t:"collapse", x:17, w:2, at:16.2 }] },
@@ -469,12 +469,12 @@ function addSecret(S, w, l, d){
   // right-going: block1 x..x+2 (row 8.7), block2 x+2.5..x+4.5 (row 6.7), ledge x+5..x+7 (row 4.4)
   const m = v => left ? x + 7 - v : x + v;                  // mirror for left-going stairs
   const box = (a, b, y, h) => ({ x:Math.min(m(a), m(b))*T, y:y*T, w:Math.abs(b - a)*T, h:h*T });
-  const hb = [box(0, 2, 8.7, 1), box(2.5, 4.5, 6.7, 1)].map(r => { const s = Object.assign(r, { on:false, vy:0, dyn:false, hidden:true }); S.solids.push(s); return s; });
-  if (kind < 2) S.solids.push(Object.assign(box(5, 7, 4.4, 0.4), { on:true, vy:0, dyn:false }));
+  const hb = [box(0, 2, 8.7, 1), box(2.5, 4.5, 6.7, 1)].map(r => { const s = Object.assign(r, { on:false, vy:0, dyn:false, hidden:true, oneway:true }); S.solids.push(s); return s; });
+  if (kind < 2) S.solids.push(Object.assign(box(5, 7, 4.4, 0.4), { on:true, vy:0, dyn:false, oneway:true }));
   S.secretAt = x;
   const k = { x:m(6)*T, y:kind < 2 ? 4.4*T - 20 : 4.9*T, got:false, old:!!skeys[id] };
   S.ents.push({ tr:{ t:"skey" }, skey:k, upd:() => {
-    for (const s of hb) if (!s.on && P.vy < 0 && ov(P, s)){ s.on = true; P.y = s.y + s.h; P.vy = 0; tone(520, 0.08, { vol:0.07 }); tone(780, 0.1, { vol:0.06, delay:0.06 }); S.effects.push({ x:s.x + s.w/2, y:s.y + 20, t:0.4 }); }
+    for (const s of hb) if (!s.on && ov(P, s)){ s.on = true; tone(520, 0.08, { vol:0.07 }); tone(780, 0.1, { vol:0.06, delay:0.06 }); S.effects.push({ x:s.x + s.w/2, y:s.y + 20, t:0.4 }); }
     if (!k.got && ov(P, { x:k.x - 12, y:k.y - 16, w:24, h:32 })){
       k.got = true;
       if (!skeys[id]){ skeys[id] = true; store.set("skeys", skeys); SFX.key(); setTimeout(() => SFX.win(), 200);
@@ -1218,10 +1218,10 @@ function camTarget(){
 function moveAxis(dx, dy){
   const list = solids();
   P.x += dx;
-  for (const s of list){ if (ov(P, s)){ if (dx > 0) P.x = s.x - P.w; else if (dx < 0) P.x = s.x + s.w; P.vx = 0; } }
+  for (const s of list){ if (!s.oneway && ov(P, s)){ if (dx > 0) P.x = s.x - P.w; else if (dx < 0) P.x = s.x + s.w; P.vx = 0; } }
   P.y += dy;
   if (dy !== 0){ P.onGround = false; P.ground = null; }
-  for (const s of list){ if (ov(P, s)){ if (dy > 0){ P.y = s.y - P.h; P.vy = 0; P.onGround = true; P.ground = s; } else if (dy < 0){ P.y = s.y + s.h; P.vy = 0; } } }
+  for (const s of list){ if (s.oneway && !(dy > 0 && P.y + P.h - dy <= s.y + 0.5)) continue; if (ov(P, s)){ if (dy > 0){ P.y = s.y - P.h; P.vy = 0; P.onGround = true; P.ground = s; } else if (dy < 0){ P.y = s.y + s.h; P.vy = 0; } } }
 }
 function update(dt){
   L.time += dt;
